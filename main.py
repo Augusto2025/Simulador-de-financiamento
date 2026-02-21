@@ -17,7 +17,6 @@ saldo_atual = 0.0
 dados_pdf = {}
 
 # --- ESTRUTURA DE SCROLL ---
-# Criando um Canvas e uma Scrollbar
 canvas = tk.Canvas(root, bg="#F0F2F5", highlightthickness=0)
 scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
 scrollable_frame = tk.Frame(canvas, bg="#F0F2F5")
@@ -29,7 +28,6 @@ scrollable_frame.bind(
 
 canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=380)
 canvas.configure(yscrollcommand=scrollbar.set)
-
 canvas.pack(side="left", fill="both", expand=True, padx=10)
 scrollbar.pack(side="right", fill="y")
 
@@ -52,8 +50,8 @@ def etapa_1_entrada():
         })
 
         lbl_saldo_1.config(text=f"Saldo Restante: R$ {saldo_atual:,.2f}", fg="#2c3e50")
+        btn_calc_1.config(state="disabled", text="✓ ETAPA CONCLUÍDA") # Desabilita botão
         frame_mensal.pack(fill="x", pady=10)
-        # Auto-scroll para baixo
         canvas.yview_moveto(0.3)
     except:
         messagebox.showerror("Erro", "Insira valores válidos na Etapa 1")
@@ -73,10 +71,10 @@ def etapa_2_mensal():
         dados_pdf.update({'m_qtd': qtd, 'm_valor': valor, 'm_juros': e_m_juros.get()})
 
         lbl_saldo_2.config(text=f"Saldo Restante: R$ {saldo_atual:,.2f}", fg="#2c3e50")
+        btn_calc_2.config(state="disabled", text="✓ MENSALIDADES OK") # Desabilita botão
         
         if saldo_atual > 0.01:
             frame_anual.pack(fill="x", pady=10)
-            btn_pdf_final.pack_forget()
             canvas.yview_moveto(1.0)
         else:
             finalizar_fluxo()
@@ -94,16 +92,45 @@ def etapa_3_anual():
             messagebox.showwarning("Atenção", f"O valor não zera o saldo!\nFalta: R$ {saldo_atual-total_anual:,.2f}")
             return
 
-        saldo_atual = 0 # Zerado
+        saldo_atual = 0 
         dados_pdf.update({'a_qtd': qtd, 'a_valor': valor, 'a_juros': e_a_juros.get()})
+        btn_calc_3.config(state="disabled", text="✓ ANUAIS OK") # Desabilita botão
         finalizar_fluxo()
     except:
         messagebox.showerror("Erro", "Valores inválidos na Etapa Anual")
 
 def finalizar_fluxo():
-    lbl_final.config(text="✓ FLUXO FINALIZADO!", fg="#27ae60")
-    btn_pdf_final.pack(fill="x", pady=10)
+    lbl_final.config(text="✓ FLUXO FINALIZADO COM SUCESSO!", fg="#27ae60")
+    frame_final_btns.pack(fill="x", pady=15)
     canvas.yview_moveto(1.0)
+
+def recomecar():
+    global saldo_atual, dados_pdf
+    if messagebox.askyesno("Recomeçar", "Deseja limpar tudo e recomeçar do zero?"):
+        saldo_atual = 0.0
+        dados_pdf = {}
+        
+        # Resetar campos
+        for e in [e_cliente, e_desc, e_valor_imovel, e_entrada, e_m_valor, e_m_qtd, e_m_juros, e_a_valor, e_a_qtd, e_a_juros]:
+            e.delete(0, tk.END)
+        
+        # Resetar Botões
+        btn_calc_1.config(state="normal", text="CALCULAR SALDO")
+        btn_calc_2.config(state="normal", text="CÁLCULO DAS MENSALIDADES")
+        btn_calc_3.config(state="normal", text="CÁLCULO DAS ANUAIS")
+        
+        # Resetar Labels
+        lbl_saldo_1.config(text="")
+        lbl_saldo_2.config(text="")
+        lbl_final.config(text="")
+        
+        # Esconder frames
+        frame_mensal.pack_forget()
+        frame_anual.pack_forget()
+        frame_final_btns.pack_forget()
+        
+        # Voltar ao topo
+        canvas.yview_moveto(0.0)
 
 def gerar_pdf():
     path = filedialog.asksaveasfilename(defaultextension=".pdf")
@@ -144,38 +171,45 @@ def criar_campo(pai, label, cor_label="#636E72"):
     ent.pack(fill="x", pady=(0, 5))
     return ent
 
-# ETAPA 1: BASE
+# ETAPA 1
 frame_base = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#DCDDE1")
 frame_base.pack(fill="x", pady=5)
-
 e_cliente = criar_campo(frame_base, "NOME DO CLIENTE")
 e_desc = criar_campo(frame_base, "DESCRIÇÃO DO IMÓVEL")
 e_valor_imovel = criar_campo(frame_base, "VALOR DO IMÓVEL (R$)")
 e_entrada = criar_campo(frame_base, "VALOR DA ENTRADA (R$)")
-
-tk.Button(frame_base, text="CALCULAR SALDO", command=etapa_1_entrada, bg="#2c3e50", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
+btn_calc_1 = tk.Button(frame_base, text="CALCULAR SALDO", command=etapa_1_entrada, bg="#2c3e50", fg="white", relief="flat", font=("Segoe UI", 8, "bold"))
+btn_calc_1.pack(fill="x", pady=5)
 lbl_saldo_1 = tk.Label(frame_base, text="", bg="white", font=("Segoe UI", 8, "bold"))
 lbl_saldo_1.pack()
 
-# ETAPA 2: MENSAL (Oculta)
+# ETAPA 2
 frame_mensal = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#3498db")
-e_m_qtd = criar_campo(frame_mensal, "QTD MENSALIDADES", "#3498db")
 e_m_valor = criar_campo(frame_mensal, "VALOR DA PARCELA", "#3498db")
+e_m_qtd = criar_campo(frame_mensal, "QTD MENSALIDADES", "#3498db")
 e_m_juros = criar_campo(frame_mensal, "JUROS MENSAL %", "#3498db")
-tk.Button(frame_mensal, text="ABATER MENSALIDADES", command=etapa_2_mensal, bg="#3498db", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
+btn_calc_2 = tk.Button(frame_mensal, text="CÁLCULO DAS MENSALIDADES", command=etapa_2_mensal, bg="#3498db", fg="white", relief="flat", font=("Segoe UI", 8, "bold"))
+btn_calc_2.pack(fill="x", pady=5)
 lbl_saldo_2 = tk.Label(frame_mensal, text="", bg="white", font=("Segoe UI", 8, "bold"))
 lbl_saldo_2.pack()
 
-# ETAPA 3: ANUAL (Oculta)
+# ETAPA 3
 frame_anual = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#e74c3c")
-e_a_qtd = criar_campo(frame_anual, "QTD ANUAIS/REFORÇOS", "#e74c3c")
 e_a_valor = criar_campo(frame_anual, "VALOR DO REFORÇO", "#e74c3c")
+e_a_qtd = criar_campo(frame_anual, "QTD ANUAIS/REFORÇOS", "#e74c3c")
 e_a_juros = criar_campo(frame_anual, "JUROS ANUAL %", "#e74c3c")
-tk.Button(frame_anual, text="ABATER ANUAIS", command=etapa_3_anual, bg="#e74c3c", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
+btn_calc_3 = tk.Button(frame_anual, text="CÁLCULO DAS ANUAIS", command=etapa_3_anual, bg="#e74c3c", fg="white", relief="flat", font=("Segoe UI", 8, "bold"))
+btn_calc_3.pack(fill="x", pady=5)
 
 # FINALIZAÇÃO
 lbl_final = tk.Label(scrollable_frame, text="", bg="#F0F2F5", font=("Segoe UI", 9, "bold"))
 lbl_final.pack(pady=5)
-btn_pdf_final = tk.Button(scrollable_frame, text="GERAR PDF OFICIAL", command=gerar_pdf, bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"), relief="flat")
+
+# Frame para botões lado a lado
+frame_final_btns = tk.Frame(scrollable_frame, bg="#F0F2F5")
+btn_pdf_final = tk.Button(frame_final_btns, text="GERAR PDF", command=gerar_pdf, bg="#27ae60", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", padx=15)
+btn_pdf_final.pack(side="left", expand=True, fill="x", padx=5)
+btn_reset = tk.Button(frame_final_btns, text="RECOMEÇAR", command=recomecar, bg="#95a5a6", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", padx=15)
+btn_reset.pack(side="left", expand=True, fill="x", padx=5)
 
 root.mainloop()
