@@ -8,123 +8,174 @@ from datetime import datetime
 
 # --- CONFIGURAÇÃO DA JANELA ---
 root = tk.Tk()
-root.title("Simulador Imobiliário")
-root.geometry("420x550")
+root.title("Simulador Progressivo Pro")
+root.geometry("420x600")
 root.configure(bg="#F0F2F5")
-root.resizable(False, False)
 
-# Estilo para os inputs
-style = ttk.Style()
-style.theme_use('clam')
+# Variáveis globais
+saldo_atual = 0.0
+dados_pdf = {}
 
-# Variável global para armazenar os dados validados
-dados_validos = None
+# --- ESTRUTURA DE SCROLL ---
+# Criando um Canvas e uma Scrollbar
+canvas = tk.Canvas(root, bg="#F0F2F5", highlightthickness=0)
+scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
+scrollable_frame = tk.Frame(canvas, bg="#F0F2F5")
 
-# --- FUNÇÕES ---
-def calcular():
-    global dados_validos
+scrollable_frame.bind(
+    "<Configure>",
+    lambda e: canvas.configure(scrollregion=canvas.bbox("all"))
+)
+
+canvas.create_window((0, 0), window=scrollable_frame, anchor="nw", width=380)
+canvas.configure(yscrollcommand=scrollbar.set)
+
+canvas.pack(side="left", fill="both", expand=True, padx=10)
+scrollbar.pack(side="right", fill="y")
+
+# --- FUNÇÕES DE LÓGICA ---
+
+def etapa_1_entrada():
+    global saldo_atual
     try:
-        v_imovel = float(e_valor_imovel.get().replace(',', '.'))
+        total = float(e_valor_imovel.get().replace(',', '.'))
         entrada = float(e_entrada.get().replace(',', '.'))
-        m_qtd = int(e_m_qtd.get() or 0)
-        m_valor = float(e_m_valor.get() or 0)
-        a_qtd = int(e_a_qtd.get() or 0)
-        a_valor = float(e_a_valor.get() or 0)
-
-        # Validação da Soma: Entrada + valor total das parcelas mensais + valor total dos reforços anuais deve ser igual ao valor do imóvel
-        soma = entrada + m_valor + a_valor
         
-        # Tolerância de 1 centavo para dízimas
-        if abs(soma - v_imovel) < 0.01:
-            dados_validos = {
-                "cliente": e_cliente.get().upper(),
-                "imovel": e_desc.get().upper(),
-                "v_imovel": v_imovel,
-                "entrada": entrada,
-                "m_qtd": m_qtd, "m_valor": m_valor, "m_juros": e_m_juros.get(),
-                "a_qtd": a_qtd, "a_valor": a_valor, "a_juros": e_a_juros.get()
-            }
-            lbl_status.config(text=f"CONFERE! Total: R$ {soma:,.2f}", fg="#27ae60")
-            btn_pdf.config(state="normal", bg="#27ae60")
+        if entrada > total:
+            messagebox.showerror("Erro", "A entrada não pode ser maior que o imóvel!")
+            return
+
+        saldo_atual = total - entrada
+        dados_pdf.update({
+            'total': total, 'entrada': entrada,
+            'cliente': e_cliente.get().upper(), 'imovel': e_desc.get().upper()
+        })
+
+        lbl_saldo_1.config(text=f"Saldo Restante: R$ {saldo_atual:,.2f}", fg="#2c3e50")
+        frame_mensal.pack(fill="x", pady=10)
+        # Auto-scroll para baixo
+        canvas.yview_moveto(0.3)
+    except:
+        messagebox.showerror("Erro", "Insira valores válidos na Etapa 1")
+
+def etapa_2_mensal():
+    global saldo_atual
+    try:
+        qtd = int(e_m_qtd.get() or 0)
+        valor = float(e_m_valor.get() or 0)
+        total_mensal = qtd * valor
+        
+        if total_mensal > (saldo_atual + 0.01):
+            messagebox.showerror("Erro", "O valor das mensais excede o saldo!")
+            return
+
+        saldo_atual -= total_mensal
+        dados_pdf.update({'m_qtd': qtd, 'm_valor': valor, 'm_juros': e_m_juros.get()})
+
+        lbl_saldo_2.config(text=f"Saldo Restante: R$ {saldo_atual:,.2f}", fg="#2c3e50")
+        
+        if saldo_atual > 0.01:
+            frame_anual.pack(fill="x", pady=10)
+            btn_pdf_final.pack_forget()
+            canvas.yview_moveto(1.0)
         else:
-            dif = v_imovel - soma
-            lbl_status.config(text=f"ERRO: Falta R$ {dif:,.2f}", fg="#d35400")
-            btn_pdf.config(state="disabled", bg="#bdc3c7")
-            messagebox.showerror("Erro de Soma", f"A soma (R$ {soma:,.2f}) não bate com o valor do imóvel.")
-    except ValueError:
-        messagebox.showerror("Erro", "Preencha todos os campos com números válidos.")
+            finalizar_fluxo()
+    except:
+        messagebox.showerror("Erro", "Valores inválidos na Etapa Mensal")
+
+def etapa_3_anual():
+    global saldo_atual
+    try:
+        qtd = int(e_a_qtd.get() or 0)
+        valor = float(e_a_valor.get() or 0)
+        total_anual = qtd * valor
+        
+        if abs(total_anual - saldo_atual) > 0.05:
+            messagebox.showwarning("Atenção", f"O valor não zera o saldo!\nFalta: R$ {saldo_atual-total_anual:,.2f}")
+            return
+
+        saldo_atual = 0 # Zerado
+        dados_pdf.update({'a_qtd': qtd, 'a_valor': valor, 'a_juros': e_a_juros.get()})
+        finalizar_fluxo()
+    except:
+        messagebox.showerror("Erro", "Valores inválidos na Etapa Anual")
+
+def finalizar_fluxo():
+    lbl_final.config(text="✓ FLUXO FINALIZADO!", fg="#27ae60")
+    btn_pdf_final.pack(fill="x", pady=10)
+    canvas.yview_moveto(1.0)
 
 def gerar_pdf():
-    if not dados_validos: return
     path = filedialog.asksaveasfilename(defaultextension=".pdf")
     if not path: return
-    
     doc = SimpleDocTemplate(path, pagesize=A4)
     elements = []
     s = getSampleStyleSheet()
     
-    elements.append(Paragraph(f"PROPOSTA: {dados_validos['cliente']}", s['Title']))
-    elements.append(Paragraph(f"Imóvel: {dados_validos['imovel']}", s['Normal']))
+    elements.append(Paragraph(f"PROPOSTA COMERCIAL: {dados_pdf['cliente']}", s['Title']))
     elements.append(Spacer(1, 15))
 
-    tabela_data = [
-        ["CONDIÇÃO", "DETALHE", "VALOR"],
-        ["VALOR TOTAL", "-", f"R$ {dados_validos['v_imovel']:,.2f}"],
-        ["ENTRADA", "-", f"R$ {dados_validos['entrada']:,.2f}"],
-        ["MENSAIS", f"{dados_validos['m_qtd']}x (Juros: {dados_validos['m_juros']}%)", f"R$ {dados_validos['m_valor']:,.2f}"],
-        ["ANUAIS", f"{dados_validos['a_qtd']}x (Juros: {dados_validos['a_juros']}%)", f"R$ {dados_validos['a_valor']:,.2f}"]
+    tabela = [
+        ["ETAPA", "DETALHE", "VALOR"],
+        ["VALOR TOTAL", "-", f"R$ {dados_pdf['total']:,.2f}"],
+        ["ENTRADA", "-", f"R$ {dados_pdf['entrada']:,.2f}"],
+        ["MENSAIS", f"{dados_pdf['m_qtd']}x (Juros: {dados_pdf.get('m_juros',0)}%)", f"R$ {dados_pdf['m_valor']:,.2f}"],
+        ["ANUAIS", f"{dados_pdf.get('a_qtd',0)}x (Juros: {dados_pdf.get('a_juros',0)}%)", f"R$ {dados_pdf.get('a_valor',0):,.2f}"],
+        ["RESULTADO", "Saldo Final", "R$ 0,00"]
     ]
     
-    t = Table(tabela_data, colWidths=[120, 180, 120])
+    t = Table(tabela, colWidths=[100, 180, 100])
     t.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#0984E3")),
+        ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2c3e50")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('ALIGN', (2,0), (2,-1), 'RIGHT'),
-        ('PADDING', (0,0), (-1,-1), 8)
+        ('ALIGN', (2,0), (2,-1), 'RIGHT')
     ]))
     elements.append(t)
     doc.build(elements)
-    messagebox.showinfo("Sucesso", "PDF Gerado com sucesso!")
+    messagebox.showinfo("Sucesso", "PDF Gerado!")
 
-# --- UI (INTERFACE) ---
-main_frame = tk.Frame(root, bg="white", padx=15, pady=10, highlightthickness=1, highlightbackground="#DCDDE1")
-main_frame.pack(padx=10, pady=10, fill=tk.BOTH, expand=True)
+# --- UI INTERFACE ---
 
-def criar_campo(pai, label, row, col, colspan=1, width=20):
-    lbl = tk.Label(pai, text=label, bg="white", fg="#636E72", font=("Segoe UI", 8))
-    lbl.grid(row=row, column=col, columnspan=colspan, sticky="w", pady=(2,0))
-    ent = ttk.Entry(pai, width=width)
-    ent.grid(row=row+1, column=col, columnspan=colspan, sticky="we", pady=(0,5), padx=2)
+def criar_campo(pai, label, cor_label="#636E72"):
+    lbl = tk.Label(pai, text=label, bg="white", fg=cor_label, font=("Segoe UI", 7, "bold"))
+    lbl.pack(anchor="w")
+    ent = ttk.Entry(pai)
+    ent.pack(fill="x", pady=(0, 5))
     return ent
 
-# Identificação
-e_cliente = criar_campo(main_frame, "Nome do Cliente", 0, 0, 2)
-e_desc = criar_campo(main_frame, "Empreendimento / Unidade", 2, 0, 2)
+# ETAPA 1: BASE
+frame_base = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#DCDDE1")
+frame_base.pack(fill="x", pady=5)
 
-# Valores Base
-e_valor_imovel = criar_campo(main_frame, "Valor Total do Imóvel", 4, 0)
-e_entrada = criar_campo(main_frame, "Valor da Entrada", 4, 1)
+e_cliente = criar_campo(frame_base, "NOME DO CLIENTE")
+e_desc = criar_campo(frame_base, "DESCRIÇÃO DO IMÓVEL")
+e_valor_imovel = criar_campo(frame_base, "VALOR DO IMÓVEL (R$)")
+e_entrada = criar_campo(frame_base, "VALOR DA ENTRADA (R$)")
 
-# Divisão Mensal e Anual
-tk.Label(main_frame, text="CONDIÇÕES MENSAIS", bg="white", fg="#0984E3", font=("Segoe UI", 8, "bold")).grid(row=6, column=0, sticky="w", pady=(10,0))
-e_m_qtd = criar_campo(main_frame, "Qtd Parcelas", 7, 0)
-e_m_valor = criar_campo(main_frame, "Valor Parcela", 9, 0)
-e_m_juros = criar_campo(main_frame, "Juros %", 11, 0)
+tk.Button(frame_base, text="CALCULAR SALDO", command=etapa_1_entrada, bg="#2c3e50", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
+lbl_saldo_1 = tk.Label(frame_base, text="", bg="white", font=("Segoe UI", 8, "bold"))
+lbl_saldo_1.pack()
 
-tk.Label(main_frame, text="CONDIÇÕES ANUAIS", bg="white", fg="#D63031", font=("Segoe UI", 8, "bold")).grid(row=6, column=1, sticky="w", pady=(10,0))
-e_a_qtd = criar_campo(main_frame, "Qtd Reforços", 7, 1)
-e_a_valor = criar_campo(main_frame, "Valor Reforço", 9, 1)
-e_a_juros = criar_campo(main_frame, "Juros %", 11, 1)
+# ETAPA 2: MENSAL (Oculta)
+frame_mensal = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#3498db")
+e_m_qtd = criar_campo(frame_mensal, "QTD MENSALIDADES", "#3498db")
+e_m_valor = criar_campo(frame_mensal, "VALOR DA PARCELA", "#3498db")
+e_m_juros = criar_campo(frame_mensal, "JUROS MENSAL %", "#3498db")
+tk.Button(frame_mensal, text="ABATER MENSALIDADES", command=etapa_2_mensal, bg="#3498db", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
+lbl_saldo_2 = tk.Label(frame_mensal, text="", bg="white", font=("Segoe UI", 8, "bold"))
+lbl_saldo_2.pack()
 
-# Botões e Status
-btn_calc = tk.Button(main_frame, text="CONFERIR SOMA", command=calcular, bg="#2D3436", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", pady=5)
-btn_calc.grid(row=13, column=0, columnspan=2, sticky="we", pady=15)
+# ETAPA 3: ANUAL (Oculta)
+frame_anual = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#e74c3c")
+e_a_qtd = criar_campo(frame_anual, "QTD ANUAIS/REFORÇOS", "#e74c3c")
+e_a_valor = criar_campo(frame_anual, "VALOR DO REFORÇO", "#e74c3c")
+e_a_juros = criar_campo(frame_anual, "JUROS ANUAL %", "#e74c3c")
+tk.Button(frame_anual, text="ABATER ANUAIS", command=etapa_3_anual, bg="#e74c3c", fg="white", relief="flat", font=("Segoe UI", 8, "bold")).pack(fill="x", pady=5)
 
-lbl_status = tk.Label(main_frame, text="Aguardando cálculo...", bg="#F1F2F6", font=("Segoe UI", 8, "bold"))
-lbl_status.grid(row=14, column=0, columnspan=2, sticky="we", pady=2)
-
-btn_pdf = tk.Button(main_frame, text="GERAR PDF", command=gerar_pdf, bg="#bdc3c7", fg="white", font=("Segoe UI", 9, "bold"), relief="flat", state="disabled", pady=5)
-btn_pdf.grid(row=15, column=0, columnspan=2, sticky="we", pady=5)
+# FINALIZAÇÃO
+lbl_final = tk.Label(scrollable_frame, text="", bg="#F0F2F5", font=("Segoe UI", 9, "bold"))
+lbl_final.pack(pady=5)
+btn_pdf_final = tk.Button(scrollable_frame, text="GERAR PDF OFICIAL", command=gerar_pdf, bg="#27ae60", fg="white", font=("Segoe UI", 10, "bold"), relief="flat")
 
 root.mainloop()
