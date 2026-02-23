@@ -1,0 +1,5 @@
+comando para gerar o executável do saldo zero com imagem
+pyinstaller --noconsole --onefile --add-data "img;img" --icon="img/Saldo-Zero-Logo.ico" --name "Saldo Zero" main.py
+
+comando para executável do gerar licensa
+pyinstaller --noconsole --onefile --name "Gerar licensa" gerador_licensa.py
