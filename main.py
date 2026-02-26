@@ -29,7 +29,7 @@ saldo_devedor_base = 0.0
 dados_pdf = {}
 
 root = tk.Tk()
-root.title("Saldo Zero - Navegação Inteligente")
+root.title("Financiamento Imobiliário")
 root.geometry("450x820")
 root.configure(bg="#F0F2F5")
 
