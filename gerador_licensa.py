@@ -25,7 +25,7 @@ app = ctk.CTk()
 app.title("Admin - Gerador de Ativação")
 app.geometry("450x300")
 
-ctk.CTkLabel(app, text="Gerador de Licença MessageFlow", font=("Segoe UI", 18, "bold")).pack(pady=20)
+ctk.CTkLabel(app, text="Gerador de Licença", font=("Segoe UI", 18, "bold")).pack(pady=20)
 
 f = ctk.CTkFrame(app)
 f.pack(pady=10, padx=20, fill="x")
