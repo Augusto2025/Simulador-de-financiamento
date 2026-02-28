@@ -189,16 +189,18 @@ def gerar_pdf():
     s = getSampleStyleSheet()
     agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     elements.append(Paragraph(f"<para align='right'><font size='8'>{agora}</font></para>", s['Normal']))
-    elements.append(Paragraph(f"PROPOSTA COMERCIAL: {dados_pdf['cliente']}", s['Title']))
+    elements.append(Paragraph(f"<para align='left'>PROPOSTA COMERCIAL: {s['Title']}</para>", s['Title']))
+    elements.append(Paragraph(f"<para align='left'>CLIENTE:{dados_pdf['cliente']}</para>", s['Title']))
+    elements.append(Paragraph(f"<para align='left'>ÍMOVEL: {dados_pdf['imovel']}</para>", s['Title']))
     elements.append(Spacer(1, 12))
     tabela = [
         ["TIPO", "QTD", "JUROS", "VALOR BASE", "PARCELA C/ J.", "TOTAL"],
         ["IMÓVEL", "-", "-", "-", "-", f"R$ {dados_pdf['total']:,.2f}"],
         ["ENTRADA", "-", "-", "-", "-", f"R$ {dados_pdf['entrada']:,.2f}"],
-        ["MENSAL", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.2f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}", f"R$ {dados_pdf['m_total']:,.2f}"]
+        ["MENSAL", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.4f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}", f"R$ {dados_pdf['m_total']:,.2f}"]
     ]
     if 'a_qtd' in dados_pdf:
-        tabela.append(["ANUAL", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.2f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}", f"R$ {dados_pdf['a_total']:,.2f}"])
+        tabela.append(["ANUAL", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.4f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}", f"R$ {dados_pdf['a_total']:,.2f}"])
     t = Table(tabela, colWidths=[65, 35, 55, 85, 85, 85])
     t.setStyle(TableStyle([('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2c3e50")), ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke), ('GRID', (0,0), (-1,-1), 0.5, colors.grey), ('FONTSIZE', (0,0), (-1,-1), 8), ('ALIGN', (0,0), (-1,-1), 'CENTER')]))
     elements.append(t)
@@ -219,7 +221,7 @@ scrollbar.pack(side="right", fill="y")
 f1 = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#DCDDE1")
 f1.pack(fill="x", pady=5)
 e_cliente = criar_campo(f1, "NOME DO CLIENTE")
-e_desc = criar_campo(f1, "UNIDADE")
+e_desc = criar_campo(f1, "IMÓVEL")
 e_valor_imovel = criar_campo(f1, "VALOR TOTAL", moeda=True)
 e_entrada = criar_campo(f1, "VALOR ENTRADA", moeda=True)
 btn_calc_1 = tk.Button(f1, text="VALIDAR E VER SALDO", command=etapa_1_entrada, bg="#2c3e50", fg="white", font=("Segoe UI", 8, "bold"), relief="flat")
@@ -238,11 +240,11 @@ lbl_res_mensal = tk.Label(frame_mensal, text="", bg="white", font=("Segoe UI", 9
 lbl_res_mensal.pack()
 
 frame_anual = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#e74c3c")
-e_a_valor = criar_campo(frame_anual, "VALOR REFORÇO BASE", "#e74c3c", moeda=True)
+e_a_valor = criar_campo(frame_anual, "VALOR ANUAL BASE", "#e74c3c", moeda=True)
 e_a_qtd = criar_campo(frame_anual, "ANUAL", "#e74c3c")
 e_a_juros = criar_campo(frame_anual, "JUROS %", "#e74c3c")
 tk.Button(frame_anual, text="← VOLTAR PARA MENSAL", command=voltar_etapa_2, bg="#95a5a6", fg="white", font=("Segoe UI", 7, "bold"), relief="flat").pack(fill="x", pady=(0,5))
-btn_calc_3 = tk.Button(frame_anual, text="CALCULAR REFORÇOS", command=etapa_3_anual, bg="#e74c3c", fg="white", font=("Segoe UI", 8, "bold"), relief="flat")
+btn_calc_3 = tk.Button(frame_anual, text="CALCULAR ANUAL", command=etapa_3_anual, bg="#e74c3c", fg="white", font=("Segoe UI", 8, "bold"), relief="flat")
 btn_calc_3.pack(fill="x", pady=5)
 lbl_res_anual = tk.Label(frame_anual, text="", bg="white", font=("Segoe UI", 9, "bold"))
 lbl_res_anual.pack()
