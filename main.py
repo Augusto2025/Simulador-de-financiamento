@@ -33,6 +33,12 @@ root.title("Financiamento Imobiliário - Saldo Zero")
 root.geometry("450x620")
 root.configure(bg="#F0F2F5")
 
+# --- ÍCONE ---
+try:
+    icon_path = resource_path("img/Saldo-Zero-Logo.ico")
+    if os.path.exists(icon_path): root.iconbitmap(icon_path)
+except: pass
+
 # --- LÓGICA DE FORMATAÇÃO MOEDA ---
 
 def formatar_moeda(event):
