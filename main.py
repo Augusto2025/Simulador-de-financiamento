@@ -30,7 +30,7 @@ dados_pdf = {}
 
 root = tk.Tk()
 root.title("Financiamento Imobiliário - Saldo Zero")
-root.geometry("450x820")
+root.geometry("450x620")
 root.configure(bg="#F0F2F5")
 
 # --- LÓGICA DE FORMATAÇÃO MOEDA ---
