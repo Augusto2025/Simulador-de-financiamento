@@ -3,3 +3,35 @@ pyinstaller --noconsole --onefile --add-data "img;img" --icon="img/Saldo-Zero-Lo
 
 comando para executável do gerar licensa
 pyinstaller --noconsole --onefile --name "Gerar licensa" gerador_licensa.py
+
+para gerar o app com o kyvi:
+instalar o kyvi:
+pip install kivy[base] kivy_examples
+
+📦 Comandos para Gerar o APK (No Google Colab)
+
+Se você já fez as instalações que te passei antes no Colab, rode estes dois comandos finais:
+
+Criar o arquivo de configuração (se ainda não tiver):
+!buildozer init
+
+(Isso gera o arquivo buildozer.spec onde você coloca o nome do app).
+
+Gerar o APK final:
+!yes | buildozer -v android debug
+
+
+comandos:
+# 1. Instalar as ferramentas de build (Buildozer)
+!pip install buildozer
+!pip install cython==0.29.33
+!sudo apt-get install -y scons libncurses5-dev libncursesw5-dev zlib1g-dev cpancython
+!sudo apt-get install -y libgstreamer1.0-dev gstreamer1.0-plugins-base gstreamer1.0-plugins-good
+
+# 2. Iniciar a configuração
+!buildozer init
+
+!sudo apt-get update
+!sudo apt-get install -y libtool pkg-config autoconf automake
+
+!yes | buildozer -v android debug
