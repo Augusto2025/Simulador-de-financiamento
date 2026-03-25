@@ -33,6 +33,7 @@ root = tk.Tk()
 root.title("Financiamento Imobiliário - Saldo Zero")
 root.geometry("450x620")
 root.configure(bg="#F0F2F5")
+root.resizable(False, False)
 
 # --- ÍCONE ---
 try:
@@ -119,7 +120,6 @@ def etapa_capitalizacao():
         valor_futuro =  saldo_devedor_base * ((1 + i) ** n)
         saldo_devedor_base = valor_futuro 
         
-        lbl_saldo_res.config(text=f"NOVO SALDO (VALOR FUTURO): R$ {saldo_devedor_base:,.2f}", fg="#8e44ad")
         lbl_res_cap.config(text=f"VALOR FUTURO ACUMULADO: R$ {valor_futuro:,.2f}", fg="#8e44ad")
         
         dados_pdf.update({'cap_n': n, 'cap_j': i*100, 'cap_total': valor_futuro, 'is_vf': True})
@@ -129,31 +129,44 @@ def etapa_capitalizacao():
     except: messagebox.showerror("Erro", "Dados de capitalização inválidos.")
 
 def etapa_2_mensal():
+    global saldo_devedor_base
     try:
         p_base = converter_para_float(e_m_valor.get())
-        if p_base > saldo_devedor_base:
+        if p_base > (saldo_devedor_base + 0.01):
             messagebox.showwarning("Valor Excedido", f"A parcela não pode ser maior que o Saldo (R$ {saldo_devedor_base:,.2f})!")
             return
 
         n = int(e_m_qtd.get() or 0)
         i = float(e_m_juros.get().replace(',', '.') or 0) / 100
+        
+        # Cálculo PRICE
         parcela_com_juros = p_base * (i * (1 + i) ** n) / ((1 + i) ** n - 1) if i > 0 else p_base
         total_acumulado = parcela_com_juros * n
         
+        # Abatimento real do saldo (valor presente)
+        abatimento_real = p_base * n 
+        
         lbl_res_mensal.config(text=f"PARCELA C/ JUROS: R$ {parcela_com_juros:,.2f}\nTOTAL NO PERÍODO: R$ {total_acumulado:,.2f}", fg="#1e3799")
-        dados_pdf.update({'m_base': p_base, 'm_qtd': n, 'm_valor': parcela_com_juros, 'm_juros': i*100, 'm_total': total_acumulado})
+        
+        dados_pdf.update({
+            'm_base': p_base, 
+            'm_qtd': n, 
+            'm_valor': parcela_com_juros, 
+            'm_juros': i*100, 
+            'm_total': total_acumulado,
+            'm_abatido': abatimento_real
+        })
+        
         btn_calc_2.config(text="✓ MENSAL CALCULADO", state="disabled")
         
-        if total_acumulado >= (saldo_devedor_base - 0.01):
+        falta = saldo_devedor_base - abatimento_real
+        if falta <= 0.01:
              finalizar_fluxo()
         else:
-            # --- AUTO-PREENCHIMENTO DO SALDO RESTANTE NO CAMPO ANUAL ---
-            falta = saldo_devedor_base - total_acumulado
             if falta < 0: falta = 0
             valor_sugerido = f"R$ {falta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             e_a_valor.delete(0, tk.END)
             e_a_valor.insert(0, valor_sugerido)
-            
             frame_anual.pack(fill="x", pady=10)
             canvas.yview_moveto(0.8)
     except: messagebox.showerror("Erro", "Verifique os dados.")
@@ -161,7 +174,8 @@ def etapa_2_mensal():
 def etapa_3_anual():
     try:
         p_base_a = converter_para_float(e_a_valor.get())
-        saldo_restante = saldo_devedor_base - dados_pdf.get('m_total', 0)
+        abatimento_mensal = dados_pdf.get('m_abatido', 0)
+        saldo_restante = saldo_devedor_base - abatimento_mensal
 
         if p_base_a > (saldo_restante + 0.01):
             messagebox.showwarning("Valor Excedido", f"O Valor Anual não pode ser maior que o saldo restante (R$ {saldo_restante:,.2f})!")
@@ -169,14 +183,25 @@ def etapa_3_anual():
 
         n_a = int(e_a_qtd.get() or 0)
         i_a = float(e_a_juros.get().replace(',', '.') or 0) / 100
+        
         parcela_anual_com_juros = p_base_a * (i_a * (1 + i_a) ** n_a) / ((1 + i_a) ** n_a - 1) if i_a > 0 else p_base_a
         total_acumulado_a = parcela_anual_com_juros * n_a
         
         lbl_res_anual.config(text=f"ANUAL C/ JUROS: R$ {parcela_anual_com_juros:,.2f}\nTOTAL ANUAL: R$ {total_acumulado_a:,.2f}", fg="#b71540")
-        dados_pdf.update({'a_base': p_base_a, 'a_qtd': n_a, 'a_valor': parcela_anual_com_juros, 'a_juros': i_a*100, 'a_total': total_acumulado_a})
+        
+        # Sincronizado: Usando 'a_total' para bater com a função gerar_pdf
+        dados_pdf.update({
+            'a_base': p_base_a, 
+            'a_qtd': n_a, 
+            'a_valor': parcela_anual_com_juros, 
+            'a_juros': i_a*100, 
+            'a_total': total_acumulado_a 
+        })
+        
         btn_calc_3.config(text="✓ ANUAL CALCULADO", state="disabled")
         finalizar_fluxo()
-    except: messagebox.showerror("Erro", "Verifique os dados.")
+    except Exception as e: 
+        messagebox.showerror("Erro", f"Verifique os dados: {e}")
 
 # --- FUNÇÕES DE VOLTAR ---
 
