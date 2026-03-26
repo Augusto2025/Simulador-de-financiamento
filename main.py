@@ -82,7 +82,7 @@ def reset_geral():
     btn_calc_1.config(state="normal", text="VALIDAR E VER SALDO")
     btn_calc_cap.config(state="normal", text="CALCULAR VALOR FUTURO")
     btn_calc_2.config(state="normal", text="CALCULAR MENSALIDADES")
-    btn_calc_3.config(state="normal", text="CALCULAR REFORÇOS")
+    btn_calc_3.config(state="normal", text="CALCULAR ANUAL")
     frame_cap.pack_forget()
     frame_mensal.pack_forget()
     frame_anual.pack_forget()
@@ -132,76 +132,80 @@ def etapa_2_mensal():
     global saldo_devedor_base
     try:
         p_base = converter_para_float(e_m_valor.get())
-        if p_base > (saldo_devedor_base + 0.01):
-            messagebox.showwarning("Valor Excedido", f"A parcela não pode ser maior que o Saldo (R$ {saldo_devedor_base:,.2f})!")
+        if p_base > (saldo_devedor_base + 0.05):
+            messagebox.showwarning("Valor Excedido", f"O valor base total não pode ser maior que o Saldo (R$ {saldo_devedor_base:,.2f})!")
             return
 
         n = int(e_m_qtd.get() or 0)
         i = float(e_m_juros.get().replace(',', '.') or 0) / 100
         
-        # Cálculo PRICE
-        parcela_com_juros = p_base * (i * (1 + i) ** n) / ((1 + i) ** n - 1) if i > 0 else p_base
-        total_acumulado = parcela_com_juros * n
+        if n > 0:
+            if i > 0:
+                parcela_com_juros = p_base * (i * (1 + i) ** n) / ((1 + i) ** n - 1)
+            else:
+                parcela_com_juros = p_base / n
+        else:
+            parcela_com_juros = 0
         
-        # Abatimento real do saldo (valor presente)
-        abatimento_real = p_base * n 
-        
-        lbl_res_mensal.config(text=f"PARCELA C/ JUROS: R$ {parcela_com_juros:,.2f}\nTOTAL NO PERÍODO: R$ {total_acumulado:,.2f}", fg="#1e3799")
+        lbl_res_mensal.config(text=f"PARCELA C/ JUROS: R$ {parcela_com_juros:,.2f}", fg="#1e3799")
         
         dados_pdf.update({
             'm_base': p_base, 
             'm_qtd': n, 
             'm_valor': parcela_com_juros, 
-            'm_juros': i*100, 
-            'm_total': total_acumulado,
-            'm_abatido': abatimento_real
+            'm_juros': i*100,
+            'm_abatido': p_base
         })
         
         btn_calc_2.config(text="✓ MENSAL CALCULADO", state="disabled")
         
-        falta = saldo_devedor_base - abatimento_real
-        if falta <= 0.01:
+        falta = round(saldo_devedor_base - p_base, 2)
+        if falta <= 0.05:
              finalizar_fluxo()
         else:
-            if falta < 0: falta = 0
             valor_sugerido = f"R$ {falta:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
             e_a_valor.delete(0, tk.END)
             e_a_valor.insert(0, valor_sugerido)
             frame_anual.pack(fill="x", pady=10)
+            root.update_idletasks()
             canvas.yview_moveto(0.8)
-    except: messagebox.showerror("Erro", "Verifique os dados.")
+    except Exception as e: 
+        messagebox.showerror("Erro", f"Erro no cálculo mensal: {e}")
 
 def etapa_3_anual():
     try:
         p_base_a = converter_para_float(e_a_valor.get())
-        abatimento_mensal = dados_pdf.get('m_abatido', 0)
-        saldo_restante = saldo_devedor_base - abatimento_mensal
+        m_abatido = dados_pdf.get('m_abatido', 0)
+        saldo_restante = round(saldo_devedor_base - m_abatido, 2)
 
-        if p_base_a > (saldo_restante + 0.01):
+        if p_base_a > (saldo_restante + 0.05):
             messagebox.showwarning("Valor Excedido", f"O Valor Anual não pode ser maior que o saldo restante (R$ {saldo_restante:,.2f})!")
             return
 
         n_a = int(e_a_qtd.get() or 0)
         i_a = float(e_a_juros.get().replace(',', '.') or 0) / 100
         
-        parcela_anual_com_juros = p_base_a * (i_a * (1 + i_a) ** n_a) / ((1 + i_a) ** n_a - 1) if i_a > 0 else p_base_a
-        total_acumulado_a = parcela_anual_com_juros * n_a
+        if n_a > 0:
+            if i_a > 0:
+                parcela_anual_com_juros = p_base_a * (i_a * (1 + i_a) ** n_a) / ((1 + i_a) ** n_a - 1)
+            else:
+                parcela_anual_com_juros = p_base_a / n_a
+        else:
+            parcela_anual_com_juros = 0
+            
+        lbl_res_anual.config(text=f"ANUAL C/ JUROS: R$ {parcela_anual_com_juros:,.2f}", fg="#b71540")
         
-        lbl_res_anual.config(text=f"ANUAL C/ JUROS: R$ {parcela_anual_com_juros:,.2f}\nTOTAL ANUAL: R$ {total_acumulado_a:,.2f}", fg="#b71540")
-        
-        # Sincronizado: Usando 'a_total' para bater com a função gerar_pdf
         dados_pdf.update({
             'a_base': p_base_a, 
             'a_qtd': n_a, 
             'a_valor': parcela_anual_com_juros, 
-            'a_juros': i_a*100, 
-            'a_total': total_acumulado_a 
+            'a_juros': i_a*100
         })
         
         btn_calc_3.config(text="✓ ANUAL CALCULADO", state="disabled")
         finalizar_fluxo()
     except Exception as e: 
-        messagebox.showerror("Erro", f"Verifique os dados: {e}")
+        messagebox.showerror("Erro", f"Erro no cálculo anual: {e}")
 
 # --- FUNÇÕES DE VOLTAR ---
 
@@ -232,7 +236,7 @@ def voltar_etapa_2():
     limpar_campos([e_a_valor, e_a_qtd, e_a_juros])
     frame_anual.pack_forget()
     lbl_res_anual.config(text="")
-    btn_calc_3.config(state="normal", text="CALCULAR REFORÇOS")
+    btn_calc_3.config(state="normal", text="CALCULAR ANUAL")
     btn_calc_2.config(state="normal", text="CALCULAR MENSALIDADES")
     canvas.yview_moveto(0.5)
 
@@ -247,32 +251,33 @@ def gerar_pdf():
     agora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
     elements.append(Paragraph(f"<para align='right'><font size='8'>{agora}</font></para>", s['Normal']))
     elements.append(Paragraph(f"PROPOSTA COMERCIAL", s['Title']))
-    elements.append(Paragraph(f"CLIENTE: {dados_pdf.get('cliente', '')}", s['Normal']))
-    elements.append(Paragraph(f"IMÓVEL: {dados_pdf.get('imovel', '')}", s['Normal']))
+    elements.append(Paragraph(f"<b>CLIENTE:</b> {dados_pdf.get('cliente', '')}", s['Normal']))
+    elements.append(Paragraph(f"<b>IMÓVEL:</b> {dados_pdf.get('imovel', '')}", s['Normal']))
     elements.append(Spacer(1, 12))
     
     tabela = [
-        ["TIPO", "QTD", "JUROS", "BASE", "PARCELA", "TOTAL"],
-        ["IMÓVEL", "-", "-", "-", "-", f"R$ {dados_pdf.get('total', 0):,.2f}"],
-        ["ENTRADA", "-", "-", "-", "-", f"R$ {dados_pdf.get('entrada', 0):,.2f}"]
+        ["DESCRIÇÃO", "QTD", "JUROS %", "VALOR BASE", "TOTAL"],
+        ["VALOR TOTAL", "-", "-", "-", f"R$ {dados_pdf.get('total', 0):,.2f}"],
+        ["ENTRADA", "-", "-", "-", f"R$ {dados_pdf.get('entrada', 0):,.2f}"]
     ]
     
     if 'cap_total' in dados_pdf:
-        tabela.append(["VALOR FUTURO", f"{dados_pdf['cap_n']}m", f"{dados_pdf['cap_j']:.2f}%", "-", "-", f"R$ {dados_pdf['cap_total']:,.2f}"])
+        tabela.append(["VALOR FUTURO", f"{dados_pdf['cap_n']}m", f"{dados_pdf['cap_j']:.2f}%", "-", f"R$ {dados_pdf['cap_total']:,.2f}"])
     
-    if 'm_total' in dados_pdf:
-        tabela.append(["MENSAL", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.2f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}", f"R$ {dados_pdf['m_total']:,.2f}"])
+    if 'm_valor' in dados_pdf:
+        tabela.append(["MENSALIDADES", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.2f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}"])
     
-    if 'a_total' in dados_pdf:
-        tabela.append(["ANUAL", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.2f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}", f"R$ {dados_pdf['a_total']:,.2f}"])
+    if 'a_valor' in dados_pdf:
+        tabela.append(["ANUAIS", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.2f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}"])
     
-    t = Table(tabela, colWidths=[75, 35, 55, 80, 80, 80])
+    t = Table(tabela, colWidths=[100, 50, 70, 110, 110])
     t.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.HexColor("#2c3e50")),
         ('TEXTCOLOR', (0,0), (-1,0), colors.whitesmoke),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
-        ('FONTSIZE', (0,0), (-1,-1), 8),
-        ('ALIGN', (0,0), (-1,-1), 'CENTER')
+        ('FONTSIZE', (0,0), (-1,-1), 9),
+        ('ALIGN', (0,0), (-1,-1), 'CENTER'),
+        ('VALIGN', (0,0), (-1,-1), 'MIDDLE'),
     ]))
     elements.append(t)
     doc.build(elements)
@@ -283,15 +288,15 @@ def gerar_excel():
     if not path: return
     try:
         tabela_dados = [
-            {"TIPO": "IMÓVEL", "TOTAL": dados_pdf.get('total', 0)},
-            {"TIPO": "ENTRADA", "TOTAL": dados_pdf.get('entrada', 0)}
+            {"DESCRIÇÃO": "VALOR TOTAL", "PARCELA C/ JUROS": dados_pdf.get('total', 0)},
+            {"DESCRIÇÃO": "ENTRADA", "PARCELA C/ JUROS": dados_pdf.get('entrada', 0)}
         ]
         if 'cap_total' in dados_pdf:
-            tabela_dados.append({"TIPO": "VALOR FUTURO", "QTD": f"{dados_pdf['cap_n']}m", "JUROS": f"{dados_pdf['cap_j']}%", "TOTAL": dados_pdf['cap_total']})
-        if 'm_total' in dados_pdf:
-            tabela_dados.append({"TIPO": "MENSAL", "QTD": f"{dados_pdf['m_qtd']}x", "JUROS": f"{dados_pdf['m_juros']:.2f}%", "BASE": dados_pdf['m_base'], "PARCELA": dados_pdf['m_valor'], "TOTAL": dados_pdf['m_total']})
-        if 'a_total' in dados_pdf:
-            tabela_dados.append({"TIPO": "ANUAL", "QTD": f"{dados_pdf['a_qtd']}x", "JUROS": f"{dados_pdf['a_juros']:.2f}%", "BASE": dados_pdf['a_base'], "PARCELA": dados_pdf['a_valor'], "TOTAL": dados_pdf['a_total']})
+            tabela_dados.append({"DESCRIÇÃO": "VALOR FUTURO", "QTD": f"{dados_pdf['cap_n']}m", "JUROS %": dados_pdf['cap_j'], "PARCELA C/ JUROS": dados_pdf['cap_total']})
+        if 'm_valor' in dados_pdf:
+            tabela_dados.append({"DESCRIÇÃO": "MENSALIDADES", "QTD": f"{dados_pdf['m_qtd']}x", "JUROS %": dados_pdf['m_juros'], "VALOR BASE": dados_pdf['m_base'], "PARCELA C/ JUROS": dados_pdf['m_valor']})
+        if 'a_valor' in dados_pdf:
+            tabela_dados.append({"DESCRIÇÃO": "ANUAL", "QTD": f"{dados_pdf['a_qtd']}x", "JUROS %": dados_pdf['a_juros'], "VALOR BASE": dados_pdf['a_base'], "PARCELA C/ JUROS": dados_pdf['a_valor']})
         
         df = pd.DataFrame(tabela_dados)
         df.to_excel(path, index=False)
