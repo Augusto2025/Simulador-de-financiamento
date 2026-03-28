@@ -1,29 +1,22 @@
 {
   "expo": {
-    "name": "deafult@sdk-54",
-    "slug": "deafult@sdk-54",
+    "name": "Simulador Financeiro",
+    "slug": "simulador-financeiro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
-    },
-    "ios": {
-      "supportsTablet": true
-    },
     "android": {
+      "package": "com.augustogabriel.simulador",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png",
-        "backgroundImage": "./assets/android-icon-background.png",
-        "monochromeImage": "./assets/android-icon-monochrome.png"
+        "foregroundImage": "./assets/android-icon-foreground.png"
       }
     },
-    "web": {
-      "favicon": "./assets/favicon.png"
-    }
+    "extra": {
+      "eas": {
+        "projectId": "b21c76eb-0a81-438e-9f01-6c2e5952507f"
+      }
+    },
+    "owner": "augusto25"
   }
 }
