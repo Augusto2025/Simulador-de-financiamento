@@ -13,16 +13,34 @@ def resource_path(relative_path):
 
 def verificar_ativacao():
     try:
-        cmd = 'wmic csproduct get uuid'
-        hwid_atual = str(subprocess.check_output(cmd, shell=True).decode().split('\n')[1].strip())
-        if not os.path.exists("config.json"): return False
+        # Método moderno para Windows 10/11
+        cmd = 'powershell (Get-CimInstance Win32_ComputerSystemProduct).UUID'
+        hwid_atual = subprocess.check_output(cmd, shell=True).decode().strip()
+        
+        # Fallback caso o UUID venha vazio ou falhe
+        if not hwid_atual:
+            cmd_alt = 'reg query "HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Cryptography" /v MachineGuid'
+            hwid_atual = subprocess.check_output(cmd_alt, shell=True).decode().split()[-1]
+
+        if not os.path.exists("config.json"): 
+            return False
+            
         with open("config.json", "r") as f:
             dados = json.load(f)
             hwid_autorizado = dados.get("hwid_autorizado")
+            
         return hwid_atual == hwid_autorizado
-    except: return False
+    except: 
+        return False
 
-if not verificar_ativacao(): exit()
+# --- VALIDAÇÃO INICIAL ---
+# IMPORTANTE: sys.exit() é o correto para executáveis compilados
+if not verificar_ativacao():
+    # Criamos uma root temporária apenas para mostrar a mensagem antes de fechar
+    erro_root = tk.Tk()
+    erro_root.withdraw()
+    messagebox.showerror("Erro de Licença", "Hardware ID não autorizado ou config.json ausente.")
+    sys.exit() 
 
 # --- VARIÁVEIS GLOBAIS ---
 saldo_devedor_base = 0.0
@@ -41,7 +59,10 @@ try:
     if os.path.exists(icon_path): root.iconbitmap(icon_path)
 except: pass
 
-# --- LÓGICA DE FORMATAÇÃO MOEDA ---
+# ... (Restante do seu código de lógica de cálculos permanece igual) ...
+
+# Nota: Mantive as funções etapa_1_entrada, etapa_capitalizacao, etc., 
+# pois a lógica de cálculo não interfere no erro de inicialização.
 
 def formatar_moeda(event):
     entry = event.widget
@@ -58,8 +79,6 @@ def formatar_moeda(event):
 def converter_para_float(texto):
     limpo = re.sub(r'[R$\s.]', '', texto).replace(',', '.')
     return float(limpo) if limpo else 0.0
-
-# --- FUNÇÕES DE LIMPEZA E RESET ---
 
 def limpar_campos(lista_campos):
     for campo in lista_campos:
@@ -88,8 +107,6 @@ def reset_geral():
     frame_anual.pack_forget()
     frame_final_btns.pack_forget()
     canvas.yview_moveto(0.0)
-
-# --- LÓGICA DE NAVEGAÇÃO ---
 
 def etapa_1_entrada():
     global saldo_devedor_base, saldo_inicial_backup
@@ -207,8 +224,6 @@ def etapa_3_anual():
     except Exception as e: 
         messagebox.showerror("Erro", f"Erro no cálculo anual: {e}")
 
-# --- FUNÇÕES DE VOLTAR ---
-
 def voltar_etapa_cap():
     global saldo_devedor_base
     saldo_devedor_base = saldo_inicial_backup 
@@ -239,8 +254,6 @@ def voltar_etapa_2():
     btn_calc_3.config(state="normal", text="CALCULAR ANUAL")
     btn_calc_2.config(state="normal", text="CALCULAR MENSALIDADES")
     canvas.yview_moveto(0.5)
-
-# --- EXPORTAÇÃO ---
 
 def gerar_pdf():
     path = filedialog.asksaveasfilename(defaultextension=".pdf")
@@ -304,8 +317,6 @@ def gerar_excel():
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao gerar Excel: {e}")
 
-# --- UI HELPER ---
-
 def criar_campo(pai, label, cor="#636E72", moeda=False):
     tk.Label(pai, text=label, bg="white", fg=cor, font=("Segoe UI", 7, "bold")).pack(anchor="w")
     ent = ttk.Entry(pai)
@@ -318,7 +329,7 @@ def finalizar_fluxo():
     frame_final_btns.pack(fill="x", pady=15)
     canvas.yview_moveto(1.0)
 
-# --- LAYOUT PRINCIPAL ---
+# --- CONSTRUÇÃO DA INTERFACE ---
 
 canvas = tk.Canvas(root, bg="#F0F2F5", highlightthickness=0)
 scrollbar = ttk.Scrollbar(root, orient="vertical", command=canvas.yview)
@@ -329,6 +340,7 @@ canvas.configure(yscrollcommand=scrollbar.set)
 canvas.pack(side="left", fill="both", expand=True, padx=10)
 scrollbar.pack(side="right", fill="y")
 
+# F1 - Dados Iniciais
 f1 = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#DCDDE1")
 f1.pack(fill="x", pady=5)
 e_cliente = criar_campo(f1, "NOME DO CLIENTE")
@@ -340,6 +352,7 @@ btn_calc_1.pack(fill="x", pady=5)
 lbl_saldo_res = tk.Label(f1, text="", bg="white", font=("Segoe UI", 9, "bold"), fg="#e67e22")
 lbl_saldo_res.pack()
 
+# Frame Capitalização
 frame_cap = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#8e44ad")
 e_cap_meses = criar_campo(frame_cap, "MESES", "#8e44ad")
 e_cap_juros = criar_campo(frame_cap, "JUROS %", "#8e44ad")
@@ -349,6 +362,7 @@ btn_calc_cap.pack(fill="x", pady=5)
 lbl_res_cap = tk.Label(frame_cap, text="", bg="white", font=("Segoe UI", 9, "bold"))
 lbl_res_cap.pack()
 
+# Frame Mensal
 frame_mensal = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#3498db")
 e_m_valor = criar_campo(frame_mensal, "VALOR PARCELA BASE", "#3498db", moeda=True)
 e_m_qtd = criar_campo(frame_mensal, "MESES", "#3498db")
@@ -359,6 +373,7 @@ btn_calc_2.pack(fill="x", pady=5)
 lbl_res_mensal = tk.Label(frame_mensal, text="", bg="white", font=("Segoe UI", 9, "bold"))
 lbl_res_mensal.pack()
 
+# Frame Anual
 frame_anual = tk.Frame(scrollable_frame, bg="white", padx=15, pady=15, highlightthickness=1, highlightbackground="#e74c3c")
 e_a_valor = criar_campo(frame_anual, "VALOR ANUAL BASE", "#e74c3c", moeda=True)
 e_a_qtd = criar_campo(frame_anual, "ANUAL", "#e74c3c")
