@@ -1,0 +1,72 @@
+====================================================================
+GUIA DEFINITIVO: GERANDO APK COM REACT NATIVE + EXPO + GITHUB ACTIONS
+====================================================================
+
+Este guia assume que você já tem um projeto React Native (Expo) 
+e quer automatizar a geração do APK via GitHub Actions.
+
+--- 1. PREPARAÇÃO DO PROJETO (ARQUIVOS LOCAIS) ---
+
+A) No arquivo 'app.json':
+   Certifique-se de que a estrutura dentro de "expo" contenha:
+   - "slug": Nome-do-projeto (sem @ ou caracteres especiais).
+   - "android": { 
+        "package": "com.seuusuario.seunomeapp",
+        "jsEngine": "jsc" 
+     }
+   - "extra": { "eas": { "projectId": "SEU-ID-AQUI" } }
+
+B) No arquivo 'eas.json' (na raiz do projeto):
+   Deve existir o perfil de preview para gerar o APK:
+   {
+     "build": {
+       "preview": {
+         "android": { "buildType": "apk" }
+       }
+     }
+   }
+
+--- 2. VINCULANDO AO EXPO (TERMINAL) ---
+
+1. Instale o EAS CLI globalmente: npm install -g eas-cli
+2. Faça login: eas login
+3. Inicie o projeto (se ainda não fez): eas project:init
+   - Isso vai gerar o 'projectId' oficial no seu app.json.
+
+--- 3. CONFIGURANDO O GITHUB ACTIONS ---
+
+1. Crie a pasta: .github/workflows/
+2. Crie o arquivo: android-build.yml
+3. No arquivo, defina os passos:
+   - Checkout do código.
+   - Setup do Node.js (v20).
+   - Instalação de dependências (npm install).
+   - Setup do Expo (expo-github-action).
+   - Comando de Build: eas build --platform android --profile preview --non-interactive
+
+*NOTA: Se o seu projeto estiver em uma subpasta (ex: /Mobile),
+lembre-se de definir 'defaults: run: working-directory: ./Mobile' no YAML.
+
+--- 4. CONFIGURANDO O SEGREDO (TOKEN) ---
+
+Para o GitHub ter permissão de criar o build:
+1. Vá em expo.dev -> Account Settings -> Access Tokens.
+2. Crie um novo Token e copie o código.
+3. No seu repositório GitHub -> Settings -> Secrets and variables -> Actions.
+4. Clique em 'New repository secret'.
+5. Nome: EXPO_TOKEN
+6. Valor: Cole o token do Expo.
+
+--- 5. EXECUTANDO E BAIXANDO O APK ---
+
+1. Dê o 'git push' do seu código para o GitHub.
+2. Acompanhe na aba 'Actions' do GitHub.
+3. Quando terminar (bolinha verde):
+   - Vá em expo.dev -> Selecione seu Projeto -> Builds.
+   - Clique no build mais recente.
+   - Use o botão 'Download' ou aponte a câmera do celular para o QR Code.
+
+====================================================================
+DICA DE OURO: Se o build falhar no 'Hermes', use "jsEngine": "jsc" 
+no seu app.json para garantir a compatibilidade inicial.
+====================================================================
