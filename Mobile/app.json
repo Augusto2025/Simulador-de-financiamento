@@ -7,7 +7,7 @@
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.augustogabriel.simulador",
-      "jsEngine": "hermes",
+      "jsEngine": "jsc",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png"
