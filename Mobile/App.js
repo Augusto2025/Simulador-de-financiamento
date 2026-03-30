@@ -1,232 +1,255 @@
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { 
-  StyleSheet, Text, View, TextInput, TouchableOpacity, 
-  ScrollView, Alert, SafeAreaView, KeyboardAvoidingView, Platform 
+  View, Text, TextInput, TouchableOpacity, ScrollView, 
+  Alert, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView 
 } from 'react-native';
 
 export default function App() {
-  // --- ESTADOS (VARIÁVEIS) ---
-  const [cliente, setCliente] = useState('');
-  const [imovel, setImovel] = useState('');
-  const [valorTotal, setValorTotal] = useState('');
-  const [entrada, setEntrada] = useState('');
-  const [saldoDevedorBase, setSaldoDevedorBase] = useState(0);
-  const [saldoInicialBackup, setSaldoInicialBackup] = useState(0);
+  const [etapa, setEtapa] = useState(1);
+  const [dados, setDados] = useState({
+    cliente: '', imovel: '', valorTotal: '', entrada: '',
+    capMeses: '', capJuros: '', mValorBase: '', mQtd: '', mJuros: '',
+    aValorBase: '', aQtd: '', aJuros: ''
+  });
 
-  // Capitalização
-  const [capMeses, setCapMeses] = useState('');
-  const [capJuros, setCapJuros] = useState('');
-  const [valorFuturo, setValorFuturo] = useState(0);
+  const [calculos, setCalculos] = useState({
+    saldoDevedor: 0, saldoInicial: 0, valorFuturo: 0, parcelaMensal: 0, parcelaAnual: 0
+  });
 
-  // Mensalidades
-  const [mVaiorBase, setMValorBase] = useState('');
-  const [mQtd, setMQtd] = useState('');
-  const [mJuros, setMJuros] = useState('');
-  const [mParcelaComJuros, setMParcelaComJuros] = useState(0);
-
-  // Anuais
-  const [aValorBase, setAValorBase] = useState('');
-  const [aQtd, setAQtd] = useState('');
-  const [aJuros, setAJuros] = useState('');
-  const [aParcelaComJuros, setAParcelaComJuros] = useState(0);
-
-  // Controle de Telas (Etapas)
-  const [etapa, setEtapa] = useState(1); // 1: Inicial, 2: Cap, 3: Mensal, 4: Anual, 5: Final
-
-  const scrollViewRef = useRef();
-
-  // --- FUNÇÕES DE AUXÍLIO ---
-  const formatMoeda = (valor) => {
-    let v = valor.replace(/\D/g, '');
-    v = (v / 100).toFixed(2) + '';
-    v = v.replace(".", ",");
-    v = v.replace(/(\d)(\d{3})(\d{3})/, "$1.$2.$3");
-    v = v.replace(/(\d)(\d{3})/, "$1.$2");
-    return "R$ " + v;
+  // --- UTILITÁRIOS ---
+  const formatarMoeda = (valor) => {
+    if (valor === null || valor === undefined || isNaN(valor)) return 'R$ 0,00';
+    return 'R$ ' + valor.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
   };
 
-  const parseMoeda = (texto) => {
+  const converterParaFloat = (texto) => {
     if (!texto) return 0;
-    return parseFloat(texto.replace(/[R$\s.]/g, '').replace(',', '.'));
+    const limpo = texto.toString().replace(/\D/g, '');
+    return (parseFloat(limpo) / 100) || 0;
   };
 
-  // --- LÓGICA DE CÁLCULO (ETAPAS) ---
+  const handleMoedaInput = (valorRaw, campo) => {
+    const apenasNumeros = valorRaw.replace(/\D/g, '');
+    setDados(prev => ({ ...prev, [campo]: apenasNumeros }));
+  };
 
-  const calcularEtapa1 = () => {
-    const total = parseMoeda(valorTotal);
-    const ent = parseMoeda(entrada);
-    const saldo = total - ent;
+  // --- VALIDAÇÕES E CÁLCULOS ---
 
-    if (saldo <= 0) {
-      Alert.alert("Erro", "Valor da entrada não pode ser maior que o total.");
-      return;
+  const validarEtapa1 = () => {
+    const total = converterParaFloat(dados.valorTotal);
+    // Cliente e Imóvel são opcionais, mas Valor Total deve ser > 0
+    if (total <= 0) {
+      return Alert.alert("Campos Obrigatórios", "Por favor, informe o Valor Total do Imóvel.");
     }
 
-    setSaldoDevedorBase(saldo);
-    setSaldoInicialBackup(saldo);
-
+    const entrada = converterParaFloat(dados.entrada);
+    const saldo = total - entrada;
+    
+    setCalculos(prev => ({ ...prev, saldoDevedor: saldo, saldoInicial: saldo }));
+    
     Alert.alert(
-      "Sucesso", 
-      `Saldo inicial: R$ ${saldo.toFixed(2)}. Deseja calcular Valor Futuro (Juros de Obra)?`,
+      "Confirmação", 
+      "Deseja capitalizar o saldo?",
       [
-        { text: "Não", onPress: () => setEtapa(3) },
-        { text: "Sim", onPress: () => setEtapa(2) }
+        { text: "NÃO", onPress: () => setEtapa(3) },
+        { text: "SIM", onPress: () => setEtapa(2) }
       ]
     );
   };
 
   const calcularCapitalizacao = () => {
-    const n = parseInt(capMeses) || 0;
-    const i = parseFloat(capJuros.replace(',', '.')) / 100 || 0;
-    const vf = saldoDevedorBase * Math.pow((1 + i), n);
-    
-    setValorFuturo(vf);
-    setSaldoDevedorBase(vf);
+    if (!dados.capMeses || !dados.capJuros) {
+      return Alert.alert("Campos Obrigatórios", "Preencha a quantidade de meses e a taxa de juros para capitalizar.");
+    }
+
+    const n = parseInt(dados.capMeses) || 0;
+    const i = parseFloat(dados.capJuros.replace(',', '.')) / 100 || 0;
+    const vf = calculos.saldoDevedor * Math.pow((1 + i), n);
+    setCalculos(prev => ({ ...prev, valorFuturo: vf, saldoDevedor: vf }));
     setEtapa(3);
   };
 
   const calcularMensal = () => {
-    const pBase = parseMoeda(mVaiorBase);
-    if (pBase > (saldoDevedorBase + 0.05)) {
-      Alert.alert("Atenção", "O valor base não pode exceder o saldo devedor!");
-      return;
+    const pBase = converterParaFloat(dados.mValorBase);
+    if (pBase <= 0 || !dados.mQtd || !dados.mJuros) {
+      return Alert.alert("Campos Obrigatórios", "Preencha o valor base, a quantidade de meses e os juros das mensalidades.");
     }
 
-    const n = parseInt(mQtd) || 0;
-    const i = parseFloat(mJuros.replace(',', '.')) / 100 || 0;
-    let parcela = 0;
-
-    if (n > 0) {
-      parcela = i > 0 ? (pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)) : (pBase / n);
+    if (pBase > (calculos.saldoDevedor + 0.10)) {
+      return Alert.alert("Erro de Valor", "O valor base das mensalidades não pode ser maior que o saldo devedor.");
     }
 
-    setMParcelaComJuros(parcela);
+    const n = parseInt(dados.mQtd) || 0;
+    const i = parseFloat(dados.mJuros.replace(',', '.')) / 100 || 0;
+
+    let parcela = n > 0 ? (i > 0 ? pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBase / n) : 0;
+    setCalculos(prev => ({ ...prev, parcelaMensal: parcela }));
     
-    const falta = (saldoDevedorBase - pBase).toFixed(2);
-    if (falta <= 0.05) {
+    const falta = calculos.saldoDevedor - pBase;
+    if (falta <= 0.10) {
       setEtapa(5);
     } else {
-      setAValorBase(formatMoeda(falta.replace('.', '')));
+      setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) }));
       setEtapa(4);
     }
   };
 
   const calcularAnual = () => {
-    const pBaseA = parseMoeda(aValorBase);
-    const n = parseInt(aQtd) || 0;
-    const i = parseFloat(aJuros.replace(',', '.')) / 100 || 0;
-    let parcela = 0;
-
-    if (n > 0) {
-      parcela = i > 0 ? (pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)) : (pBaseA / n);
+    const pBaseA = converterParaFloat(dados.aValorBase);
+    if (pBaseA <= 0 || !dados.aQtd || !dados.aJuros) {
+      return Alert.alert("Campos Obrigatórios", "Preencha todos os campos dos reforços anuais.");
     }
 
-    setAParcelaComJuros(parcela);
+    const n = parseInt(dados.aQtd) || 0;
+    const i = parseFloat(dados.aJuros.replace(',', '.')) / 100 || 0;
+    let parcela = n > 0 ? (i > 0 ? pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBaseA / n) : 0;
+    setCalculos(prev => ({ ...prev, parcelaAnual: parcela }));
     setEtapa(5);
   };
 
-  const reset = () => {
-    setEtapa(1);
-    setCliente(''); setImovel(''); setValorTotal(''); setEntrada('');
-    setCapMeses(''); setCapJuros(''); setMValorBase(''); setMQtd('');
-    setMJuros(''); setAValorBase(''); setAQtd(''); setAJuros('');
+  // --- NAVEGAÇÃO ---
+  const voltarParaEtapaAnterior = () => {
+    if (etapa === 4) {
+      setDados(prev => ({ ...prev, aValorBase: '', aQtd: '', aJuros: '' }));
+      setCalculos(prev => ({ ...prev, parcelaAnual: 0 }));
+      setEtapa(3);
+    } 
+    else if (etapa === 3) {
+      setDados(prev => ({ ...prev, mValorBase: '', mQtd: '', mJuros: '' }));
+      setCalculos(prev => ({ ...prev, parcelaMensal: 0 }));
+      setEtapa(calculos.valorFuturo > 0 ? 2 : 1);
+    }
+    else if (etapa === 2) {
+      setDados(prev => ({ ...prev, capMeses: '', capJuros: '' }));
+      setCalculos(prev => ({ ...prev, valorFuturo: 0 }));
+      setEtapa(1);
+    }
   };
 
-  // --- RENDERIZAÇÃO ---
+  const resetGeral = () => {
+    setEtapa(1);
+    setDados({
+      cliente: '', imovel: '', valorTotal: '', entrada: '',
+      capMeses: '', capJuros: '', mValorBase: '', mQtd: '', mJuros: '',
+      aValorBase: '', aQtd: '', aJuros: ''
+    });
+    setCalculos({ saldoDevedor: 0, saldoInicial: 0, valorFuturo: 0, parcelaMensal: 0, parcelaAnual: 0 });
+  };
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex: 1}}>
-        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
-          
-          <Text style={styles.title}>Simulador Saldo Zero</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
+          <Text style={styles.header}>Simulador Saldo Zero</Text>
 
-          {/* ETAPA 1: DADOS INICIAIS */}
-          <View style={styles.card}>
-            <Text style={styles.label}>NOME DO CLIENTE</Text>
-            <TextInput style={styles.input} value={cliente} onChangeText={setCliente} placeholder="Ex: João Silva" />
-            
-            <Text style={styles.label}>VALOR TOTAL DO IMÓVEL</Text>
-            <TextInput style={styles.input} value={valorTotal} onChangeText={(t) => setValorTotal(formatMoeda(t))} keyboardType="numeric" />
-            
-            <Text style={styles.label}>VALOR ENTRADA</Text>
-            <TextInput style={styles.input} value={entrada} onChangeText={(t) => setEntrada(formatMoeda(t))} keyboardType="numeric" />
+          {/* 1. DADOS INICIAIS */}
+          <Card title="1. Dados Iniciais">
+            <CustomInput label="CLIENTE (OPCIONAL)" value={dados.cliente} onChangeText={t => setDados({...dados, cliente: t})} />
+            <CustomInput label="IMÓVEL (OPCIONAL)" value={dados.imovel} onChangeText={t => setDados({...dados, imovel: t})} />
+            <CustomInput label="VALOR TOTAL *" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.valorTotal))} onChangeText={t => handleMoedaInput(t, 'valorTotal')} />
+            <CustomInput label="ENTRADA" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.entrada))} onChangeText={t => handleMoedaInput(t, 'entrada')} />
+            {etapa === 1 && <Btn onPress={validarEtapa1} color="#2c3e50" title="PRÓXIMO" />}
+            {calculos.saldoInicial > 0 && <Text style={styles.res}>Saldo: {formatarMoeda(calculos.saldoInicial)}</Text>}
+          </Card>
 
-            <TouchableOpacity style={styles.btnPrimary} onPress={calcularEtapa1} disabled={etapa > 1}>
-              <Text style={styles.btnText}>{etapa > 1 ? "✓ VALIDADO" : "VALIDAR DADOS"}</Text>
-            </TouchableOpacity>
-            {saldoDevedorBase > 0 && <Text style={styles.resSub}>Saldo: R$ {saldoDevedorBase.toLocaleString('pt-BR')}</Text>}
-          </View>
-
-          {/* ETAPA 2: CAPITALIZAÇÃO */}
-          {etapa >= 2 && etapa !== 3 && etapa !== 4 && etapa !== 5 && (
-            <View style={[styles.card, {borderColor: '#8e44ad', borderLeftWidth: 5}]}>
-              <Text style={styles.labelColor}>VALOR FUTURO (JUROS DE OBRA)</Text>
-              <TextInput style={styles.input} placeholder="Meses" value={capMeses} onChangeText={setCapMeses} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Taxa %" value={capJuros} onChangeText={setCapJuros} keyboardType="numeric" />
-              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#8e44ad'}]} onPress={calcularCapitalizacao}>
-                <Text style={styles.btnText}>CALCULAR VALOR FUTURO</Text>
-              </TouchableOpacity>
-            </View>
+          {/* 2. CAPITALIZAÇÃO */}
+          {etapa === 2 && (
+            <Card title="2. Capitalização" color="#8e44ad">
+              <CustomInput label="MESES *" keyboardType="numeric" value={dados.capMeses} onChangeText={t => setDados({...dados, capMeses: t})} />
+              <CustomInput label="TAXA JUROS % *" keyboardType="numeric" value={dados.capJuros} onChangeText={t => setDados({...dados, capJuros: t})} />
+              <View style={styles.row}>
+                <Btn onPress={() => setEtapa(1)} color="#95a5a6" title="VOLTAR" half />
+                <Btn onPress={calcularCapitalizacao} color="#8e44ad" title="CALCULAR" half />
+              </View>
+            </Card>
           )}
 
-          {/* ETAPA 3: MENSALIDADES */}
-          {etapa >= 3 && (
-            <View style={[styles.card, {borderColor: '#3498db', borderLeftWidth: 5}]}>
-              <Text style={styles.labelColor}>MENSALIDADES</Text>
-              <TextInput style={styles.input} value={mVaiorBase} onChangeText={(t) => setMValorBase(formatMoeda(t))} placeholder="Valor Base para Mensais" keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Qtd Meses" value={mQtd} onChangeText={setMQtd} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Taxa Mensal %" value={mJuros} onChangeText={setMJuros} keyboardType="numeric" />
-              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#3498db'}]} onPress={calcularMensal} disabled={etapa > 3}>
-                <Text style={styles.btnText}>{etapa > 3 ? "✓ CALCULADO" : "CALCULAR MENSAL"}</Text>
-              </TouchableOpacity>
-              {mParcelaComJuros > 0 && <Text style={styles.resSub}>Parcela: R$ {mParcelaComJuros.toFixed(2)}</Text>}
-            </View>
+          {/* 3. MENSALIDADES */}
+          {etapa >= 3 && etapa !== 2 && (
+            <Card title="3. Mensalidades" color="#3498db">
+              {calculos.valorFuturo > 0 && (
+                <View style={styles.infoCapBox}><Text style={styles.infoCapText}>Saldo Capitalizado: {formatarMoeda(calculos.valorFuturo)}</Text></View>
+              )}
+              <CustomInput label="VALOR BASE MENSAL *" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.mValorBase))} onChangeText={t => handleMoedaInput(t, 'mValorBase')} />
+              <CustomInput label="QUANTIDADE MESES *" keyboardType="numeric" value={dados.mQtd} onChangeText={t => setDados({...dados, mQtd: t})} />
+              <CustomInput label="TAXA JUROS % *" keyboardType="numeric" value={dados.mJuros} onChangeText={t => setDados({...dados, mJuros: t})} />
+              {etapa === 3 && (
+                <View style={styles.row}>
+                  <Btn onPress={voltarParaEtapaAnterior} color="#95a5a6" title="VOLTAR" half />
+                  <Btn onPress={calcularMensal} color="#3498db" title="CALCULAR" half />
+                </View>
+              )}
+              {calculos.parcelaMensal > 0 && <Text style={styles.resBlue}>Parcela: {formatarMoeda(calculos.parcelaMensal)}</Text>}
+            </Card>
           )}
 
-          {/* ETAPA 4: ANUAIS */}
+          {/* 4. ANUAIS */}
           {etapa >= 4 && (
-            <View style={[styles.card, {borderColor: '#e74c3c', borderLeftWidth: 5}]}>
-              <Text style={styles.labelColor}>ANUAIS / REFORÇOS</Text>
-              <TextInput style={styles.input} value={aValorBase} onChangeText={(t) => setAValorBase(formatMoeda(t))} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Qtd Anos" value={aQtd} onChangeText={setAQtd} keyboardType="numeric" />
-              <TextInput style={styles.input} placeholder="Taxa Anual %" value={aJuros} onChangeText={setAJuros} keyboardType="numeric" />
-              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#e74c3c'}]} onPress={calcularAnual} disabled={etapa > 4}>
-                <Text style={styles.btnText}>{etapa > 4 ? "✓ CALCULADO" : "CALCULAR ANUAL"}</Text>
-              </TouchableOpacity>
-              {aParcelaComJuros > 0 && <Text style={styles.resSub}>Anual: R$ {aParcelaComJuros.toFixed(2)}</Text>}
-            </View>
+            <Card title="4. Anuais/Reforços" color="#e74c3c">
+              <CustomInput label="VALOR BASE ANUAL *" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.aValorBase))} onChangeText={t => handleMoedaInput(t, 'aValorBase')} />
+              <CustomInput label="QTD ANUAIS *" keyboardType="numeric" value={dados.aQtd} onChangeText={t => setDados({...dados, aQtd: t})} />
+              <CustomInput label="JUROS % *" keyboardType="numeric" value={dados.aJuros} onChangeText={t => setDados({...dados, aJuros: t})} />
+              {etapa === 4 && (
+                <View style={styles.row}>
+                  <Btn onPress={voltarParaEtapaAnterior} color="#95a5a6" title="VOLTAR" half />
+                  <Btn onPress={calcularAnual} color="#e74c3c" title="CALCULAR" half />
+                </View>
+              )}
+              {calculos.parcelaAnual > 0 && <Text style={styles.resRed}>Parcela Anual: {formatarMoeda(calculos.parcelaAnual)}</Text>}
+            </Card>
           )}
 
-          {/* FINALIZAÇÃO */}
+          {/* FINAL */}
           {etapa === 5 && (
-            <View style={styles.cardFinal}>
-              <Text style={styles.finalTitle}>✓ SIMULAÇÃO CONCLUÍDA</Text>
-              <Text>Cliente: {cliente}</Text>
-              <Text>Saldo Final Zerado com sucesso.</Text>
-              <TouchableOpacity style={styles.btnReset} onPress={reset}>
-                <Text style={styles.btnText}>NOVA SIMULAÇÃO</Text>
-              </TouchableOpacity>
+            <View style={styles.footer}>
+              <Text style={styles.ok}>Simulação Finalizada!</Text>
+              <Btn onPress={resetGeral} color="#e67e22" title="NOVA SIMULAÇÃO" />
             </View>
           )}
-
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
+// --- COMPONENTES VISUAIS ---
+const Card = ({ children, title, color = "#2c3e50" }) => (
+  <View style={[styles.card, { borderTopColor: color }]}>
+    <Text style={[styles.cardTitle, { color }]}>{title}</Text>
+    {children}
+  </View>
+);
+
+const CustomInput = ({ label, ...props }) => (
+  <View style={styles.inputGap}>
+    <Text style={styles.label}>{label}</Text>
+    <TextInput {...props} style={styles.input} placeholderTextColor="#ccc" />
+  </View>
+);
+
+const Btn = ({ title, onPress, color, half }) => (
+  <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.btn, { backgroundColor: color, flex: half ? 1 : undefined, marginHorizontal: half ? 5 : 0 }]}>
+    <Text style={styles.btnText}>{title}</Text>
+  </TouchableOpacity>
+);
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F0F2F5' },
-  scrollContent: { padding: 20 },
-  title: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', marginBottom: 20 },
-  card: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 15, elevation: 3 },
-  cardFinal: { backgroundColor: '#dff9fb', padding: 20, borderRadius: 10, alignItems: 'center' },
-  label: { fontSize: 12, fontWeight: 'bold', color: '#636e72', marginBottom: 5 },
-  labelColor: { fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
-  input: { backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#ddd', borderRadius: 5, padding: 10, marginBottom: 10 },
-  btnPrimary: { backgroundColor: '#2c3e50', padding: 15, borderRadius: 5, alignItems: 'center' },
-  btnReset: { backgroundColor: '#e67e22', padding: 15, borderRadius: 5, alignItems: 'center', marginTop: 15, width: '100%' },
-  btnText: { color: 'white', fontWeight: 'bold' },
-  resSub: { marginTop: 10, fontSize: 16, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center' },
-  finalTitle: { fontSize: 18, fontWeight: 'bold', color: '#27ae60', marginBottom: 10 }
+  scrollContent: { padding: 20, paddingBottom: 100 },
+  header: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#2c3e50' },
+  card: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 15, borderTopWidth: 4, elevation: 4 },
+  cardTitle: { fontWeight: 'bold', marginBottom: 10, fontSize: 13, textTransform: 'uppercase' },
+  label: { fontSize: 10, color: '#95a5a6', fontWeight: 'bold', marginBottom: 2 },
+  input: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 8, marginBottom: 10, fontSize: 16, color: '#333' },
+  inputGap: { marginBottom: 5 },
+  btn: { padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  btnText: { color: 'white', fontWeight: 'bold', fontSize: 13 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: -5 },
+  footer: { marginTop: 20, alignItems: 'center', paddingBottom: 50 },
+  ok: { color: '#27ae60', fontWeight: 'bold', fontSize: 18, marginBottom: 10 },
+  res: { textAlign: 'center', fontWeight: 'bold', marginTop: 10, color: '#2c3e50', fontSize: 15 },
+  resBlue: { textAlign: 'center', color: '#2980b9', fontWeight: 'bold', marginTop: 10, fontSize: 16 },
+  resRed: { textAlign: 'center', color: '#c0392b', fontWeight: 'bold', marginTop: 10, fontSize: 16 },
+  infoCapBox: { backgroundColor: '#f3e5f5', padding: 10, borderRadius: 6, marginBottom: 15, borderLeftWidth: 3, borderLeftColor: '#8e44ad' },
+  infoCapText: { color: '#8e44ad', fontWeight: 'bold', fontSize: 12 }
 });
