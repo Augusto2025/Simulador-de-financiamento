@@ -6,13 +6,23 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "android": {
-      "package": "com.augustogabriel.simuladorv10",
+      "package": "com.augustogabriel.simuladorv11",
       "jsEngine": "hermes",
       "newArchEnabled": false,
       "adaptiveIcon": {
         "backgroundColor": "#ffffff"
       }
     },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "kotlinVersion": "2.0.20"
+          }
+        }
+      ]
+    ],
     "extra": {
       "eas": {
         "projectId": "b21c76eb-0a81-438e-9f01-6c2e5952507f"
