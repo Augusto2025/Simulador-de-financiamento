@@ -4,7 +4,8 @@ import {
   Alert, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView 
 } from 'react-native';
 
-const FinanceApp = () => {
+// Mudança crucial: Nomeamos a função como 'App' para evitar erros de registo nativo
+export default function App() {
   const [etapa, setEtapa] = useState(1);
   const [dados, setDados] = useState({
     cliente: '', imovel: '', valorTotal: '', entrada: '',
@@ -16,16 +17,21 @@ const FinanceApp = () => {
     saldoDevedor: 0, saldoInicial: 0, parcelaMensal: 0, parcelaAnual: 0
   });
 
-  // Formatação manual para não quebrar o Android
+  // Formatação com verificação extra de segurança para evitar crashes no APK
   const formatarMoeda = (valor) => {
-    if (isNaN(valor)) return 'R$ 0,00';
-    return 'R$ ' + valor.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    if (valor === null || valor === undefined || isNaN(valor)) return 'R$ 0,00';
+    try {
+      return 'R$ ' + valor.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
+    } catch (e) {
+      return 'R$ 0,00';
+    }
   };
 
   const converterParaFloat = (texto) => {
     if (!texto) return 0;
     const limpo = texto.toString().replace(/\D/g, '');
-    return parseFloat(limpo) / 100;
+    const num = parseFloat(limpo) / 100;
+    return isNaN(num) ? 0 : num;
   };
 
   const handleMoedaInput = (valorRaw, campo) => {
@@ -55,26 +61,41 @@ const FinanceApp = () => {
   const calcularMensal = () => {
     const pBase = converterParaFloat(dados.mValorBase);
     const n = parseInt(dados.mQtd) || 0;
-    const i = parseFloat(dados.mJuros.replace(',', '.')) / 100 || 0;
+    const jurosTexto = (dados.mJuros || "0").toString().replace(',', '.');
+    const i = parseFloat(jurosTexto) / 100 || 0;
+    
     let parcela = n > 0 ? (i > 0 ? pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBase / n) : 0;
+    
     setCalculos(prev => ({ ...prev, parcelaMensal: parcela }));
     const falta = calculos.saldoDevedor - pBase;
-    if (falta <= 0.10) setEtapa(4); 
-    else { setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) })); setEtapa(3); }
+    
+    if (falta <= 0.10) {
+      setEtapa(4); 
+    } else { 
+      setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) })); 
+      setEtapa(3); 
+    }
   };
 
   const calcularAnual = () => {
     const pBaseA = converterParaFloat(dados.aValorBase);
     const n = parseInt(dados.aQtd) || 0;
-    const i = parseFloat(dados.aJuros.replace(',', '.')) / 100 || 0;
+    const jurosTexto = (dados.aJuros || "0").toString().replace(',', '.');
+    const i = parseFloat(jurosTexto) / 100 || 0;
+    
     let parcela = n > 0 ? (i > 0 ? pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBaseA / n) : 0;
+    
     setCalculos(prev => ({ ...prev, parcelaAnual: parcela }));
     setEtapa(4);
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F0F2F5' }}>
-      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{ flex: 1 }}>
+      {/* No Android 14, removemos o 'behavior' para evitar loops de renderização no teclado */}
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === "ios" ? "padding" : undefined} 
+        style={{ flex: 1 }}
+      >
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <Text style={styles.header}>Simulador Financeiro</Text>
 
@@ -116,7 +137,7 @@ const FinanceApp = () => {
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
+}
 
 const Card = ({ children, title, color = "#2c3e50" }) => (
   <View style={[styles.card, { borderTopColor: color }]}>
@@ -133,7 +154,7 @@ const CustomInput = ({ label, ...props }) => (
 );
 
 const Btn = ({ title, onPress, color }) => (
-  <TouchableOpacity onPress={onPress} style={[styles.btn, { backgroundColor: color }]}>
+  <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.btn, { backgroundColor: color }]}>
     <Text style={styles.btnText}>{title}</Text>
   </TouchableOpacity>
 );
@@ -144,7 +165,7 @@ const styles = StyleSheet.create({
   card: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 15, borderTopWidth: 4, elevation: 3 },
   cardTitle: { fontWeight: 'bold', marginBottom: 10 },
   label: { fontSize: 10, color: '#95a5a6' },
-  input: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 5, marginBottom: 10, fontSize: 16 },
+  input: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 5, marginBottom: 10, fontSize: 16, color: '#000' },
   inputGap: { marginBottom: 5 },
   btn: { padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
   btnText: { color: 'white', fontWeight: 'bold' },
@@ -154,5 +175,3 @@ const styles = StyleSheet.create({
   resBlue: { textAlign: 'center', color: '#2980b9', fontWeight: 'bold', marginTop: 5 },
   resRed: { textAlign: 'center', color: '#c0392b', fontWeight: 'bold', marginTop: 5 },
 });
-
-export default FinanceApp;
