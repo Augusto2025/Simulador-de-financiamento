@@ -4,10 +4,13 @@
     "slug": "simulador-financeiro",
     "version": "1.0.0",
     "orientation": "portrait",
+    "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "android": {
       "package": "com.augustogabriel.simulador",
       "jsEngine": "jsc",
+      "softwareKeyboardLayoutMode": "pan",
+      "allowBackup": false,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png"
