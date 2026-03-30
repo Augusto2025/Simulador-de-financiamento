@@ -1,0 +1,51 @@
+========================================================================
+GUIA DE RESOLUÇÃO: ERRO DE GRADLE E COMPATIBILIDADE EXPO SDK 54
+========================================================================
+
+SINTOMAS DO ERRO:
+1. O app fechava sozinho (crash) ao abrir no Android 14/15.
+2. Build falhando com: "Can't find KSP version for Kotlin version 1.9.24".
+3. Erro de Gradle: "Could not get unknown property 'kotlinVersion'".
+4. Expo Doctor acusando versões divergentes de React (18 vs 19).
+
+CAUSA RAIZ:
+O Expo SDK 54 é uma versão de transição que exige o motor de renderização
+Hermes atualizado, React 19 e, principalmente, o compilador Kotlin 2.0+.
+O projeto estava tentando rodar bibliotecas modernas com um "motor" antigo.
+
+PASSO A PASSO DA SOLUÇÃO APLICADA:
+
+1. ALINHAMENTO DE DEPENDÊNCIAS (package.json):
+   - Atualizamos o 'react-native' para a versão 0.81.x (exigida pelo SDK 54).
+   - Atualizamos o 'react' para a versão 19.1.0.
+   - Instalamos o 'expo-build-properties' para gerenciar flags nativas.
+
+2. AJUSTE DE PLUGINS (app.json):
+   - Adicionamos o plugin 'expo-build-properties'.
+   - Configuramos o 'newArchEnabled' como false (para garantir estabilidade
+     em apps simples que não usam a nova arquitetura).
+   - Alteramos o 'package' name (ex: simuladorv11) para forçar o servidor
+     da EAS a criar um registro limpo no Android, evitando conflitos de IDs.
+
+3. COMANDO DE CORREÇÃO AUTOMÁTICA:
+   - Executamos: 'npx expo install --check'
+   - Esse comando é vital porque ele consulta os servidores da Expo e 
+     sobrescreve qualquer versão errada no package.json pelas versões
+     oficiais homologadas para aquele SDK.
+
+4. LIMPEZA DE CACHE DO AMBIENTE (Crucial):
+   - Apagamos 'node_modules' e 'package-lock.json' localmente.
+   - Rodamos 'npm install' para gerar um novo lockfile limpo.
+   - No comando de build, usamos a flag '--clear-cache':
+     'eas build --platform android --profile preview --clear-cache'
+
+RESULTADO:
+O Gradle conseguiu baixar o Kotlin 2.0.20 corretamente, o React 19 
+alinhou com o SDK 54 e o binário (APK) foi gerado com as bibliotecas
+nativas corretas para rodar no Android 14 sem crashar.
+
+========================================================================
+DICA PARA O PRÓXIMO APP: 
+Sempre comece rodando 'npx expo doctor'. Se ele mostrar "Major version 
+mismatch", não tente dar build antes de rodar 'npx expo install --check'.
+========================================================================

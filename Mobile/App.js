@@ -1,177 +1,232 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { 
-  View, Text, TextInput, TouchableOpacity, ScrollView, 
-  Alert, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView 
+  StyleSheet, Text, View, TextInput, TouchableOpacity, 
+  ScrollView, Alert, SafeAreaView, KeyboardAvoidingView, Platform 
 } from 'react-native';
 
-// Mudança crucial: Nomeamos a função como 'App' para evitar erros de registo nativo
 export default function App() {
-  const [etapa, setEtapa] = useState(1);
-  const [dados, setDados] = useState({
-    cliente: '', imovel: '', valorTotal: '', entrada: '',
-    capMeses: '', capJuros: '', mValorBase: '', mQtd: '', mJuros: '',
-    aValorBase: '', aQtd: '', aJuros: ''
-  });
+  // --- ESTADOS (VARIÁVEIS) ---
+  const [cliente, setCliente] = useState('');
+  const [imovel, setImovel] = useState('');
+  const [valorTotal, setValorTotal] = useState('');
+  const [entrada, setEntrada] = useState('');
+  const [saldoDevedorBase, setSaldoDevedorBase] = useState(0);
+  const [saldoInicialBackup, setSaldoInicialBackup] = useState(0);
 
-  const [calculos, setCalculos] = useState({
-    saldoDevedor: 0, saldoInicial: 0, parcelaMensal: 0, parcelaAnual: 0
-  });
+  // Capitalização
+  const [capMeses, setCapMeses] = useState('');
+  const [capJuros, setCapJuros] = useState('');
+  const [valorFuturo, setValorFuturo] = useState(0);
 
-  // Formatação com verificação extra de segurança para evitar crashes no APK
-  const formatarMoeda = (valor) => {
-    if (valor === null || valor === undefined || isNaN(valor)) return 'R$ 0,00';
-    try {
-      return 'R$ ' + valor.toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-    } catch (e) {
-      return 'R$ 0,00';
-    }
+  // Mensalidades
+  const [mVaiorBase, setMValorBase] = useState('');
+  const [mQtd, setMQtd] = useState('');
+  const [mJuros, setMJuros] = useState('');
+  const [mParcelaComJuros, setMParcelaComJuros] = useState(0);
+
+  // Anuais
+  const [aValorBase, setAValorBase] = useState('');
+  const [aQtd, setAQtd] = useState('');
+  const [aJuros, setAJuros] = useState('');
+  const [aParcelaComJuros, setAParcelaComJuros] = useState(0);
+
+  // Controle de Telas (Etapas)
+  const [etapa, setEtapa] = useState(1); // 1: Inicial, 2: Cap, 3: Mensal, 4: Anual, 5: Final
+
+  const scrollViewRef = useRef();
+
+  // --- FUNÇÕES DE AUXÍLIO ---
+  const formatMoeda = (valor) => {
+    let v = valor.replace(/\D/g, '');
+    v = (v / 100).toFixed(2) + '';
+    v = v.replace(".", ",");
+    v = v.replace(/(\d)(\d{3})(\d{3})/, "$1.$2.$3");
+    v = v.replace(/(\d)(\d{3})/, "$1.$2");
+    return "R$ " + v;
   };
 
-  const converterParaFloat = (texto) => {
+  const parseMoeda = (texto) => {
     if (!texto) return 0;
-    const limpo = texto.toString().replace(/\D/g, '');
-    const num = parseFloat(limpo) / 100;
-    return isNaN(num) ? 0 : num;
+    return parseFloat(texto.replace(/[R$\s.]/g, '').replace(',', '.'));
   };
 
-  const handleMoedaInput = (valorRaw, campo) => {
-    const apenasNumeros = valorRaw.replace(/\D/g, '');
-    setDados(prev => ({ ...prev, [campo]: apenasNumeros }));
+  // --- LÓGICA DE CÁLCULO (ETAPAS) ---
+
+  const calcularEtapa1 = () => {
+    const total = parseMoeda(valorTotal);
+    const ent = parseMoeda(entrada);
+    const saldo = total - ent;
+
+    if (saldo <= 0) {
+      Alert.alert("Erro", "Valor da entrada não pode ser maior que o total.");
+      return;
+    }
+
+    setSaldoDevedorBase(saldo);
+    setSaldoInicialBackup(saldo);
+
+    Alert.alert(
+      "Sucesso", 
+      `Saldo inicial: R$ ${saldo.toFixed(2)}. Deseja calcular Valor Futuro (Juros de Obra)?`,
+      [
+        { text: "Não", onPress: () => setEtapa(3) },
+        { text: "Sim", onPress: () => setEtapa(2) }
+      ]
+    );
   };
 
-  const resetGeral = () => {
-    setEtapa(1);
-    setDados({
-      cliente: '', imovel: '', valorTotal: '', entrada: '',
-      capMeses: '', capJuros: '', mValorBase: '', mQtd: '', mJuros: '',
-      aValorBase: '', aQtd: '', aJuros: ''
-    });
-    setCalculos({ saldoDevedor: 0, saldoInicial: 0, parcelaMensal: 0, parcelaAnual: 0 });
-  };
-
-  const validarEtapa1 = () => {
-    const total = converterParaFloat(dados.valorTotal);
-    const entrada = converterParaFloat(dados.entrada);
-    const saldo = total - entrada;
-    if (total <= 0) return Alert.alert("Atenção", "Informe o valor do imóvel.");
-    setCalculos(prev => ({ ...prev, saldoDevedor: saldo, saldoInicial: saldo }));
-    setEtapa(2);
+  const calcularCapitalizacao = () => {
+    const n = parseInt(capMeses) || 0;
+    const i = parseFloat(capJuros.replace(',', '.')) / 100 || 0;
+    const vf = saldoDevedorBase * Math.pow((1 + i), n);
+    
+    setValorFuturo(vf);
+    setSaldoDevedorBase(vf);
+    setEtapa(3);
   };
 
   const calcularMensal = () => {
-    const pBase = converterParaFloat(dados.mValorBase);
-    const n = parseInt(dados.mQtd) || 0;
-    const jurosTexto = (dados.mJuros || "0").toString().replace(',', '.');
-    const i = parseFloat(jurosTexto) / 100 || 0;
+    const pBase = parseMoeda(mVaiorBase);
+    if (pBase > (saldoDevedorBase + 0.05)) {
+      Alert.alert("Atenção", "O valor base não pode exceder o saldo devedor!");
+      return;
+    }
+
+    const n = parseInt(mQtd) || 0;
+    const i = parseFloat(mJuros.replace(',', '.')) / 100 || 0;
+    let parcela = 0;
+
+    if (n > 0) {
+      parcela = i > 0 ? (pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)) : (pBase / n);
+    }
+
+    setMParcelaComJuros(parcela);
     
-    let parcela = n > 0 ? (i > 0 ? pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBase / n) : 0;
-    
-    setCalculos(prev => ({ ...prev, parcelaMensal: parcela }));
-    const falta = calculos.saldoDevedor - pBase;
-    
-    if (falta <= 0.10) {
-      setEtapa(4); 
-    } else { 
-      setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) })); 
-      setEtapa(3); 
+    const falta = (saldoDevedorBase - pBase).toFixed(2);
+    if (falta <= 0.05) {
+      setEtapa(5);
+    } else {
+      setAValorBase(formatMoeda(falta.replace('.', '')));
+      setEtapa(4);
     }
   };
 
   const calcularAnual = () => {
-    const pBaseA = converterParaFloat(dados.aValorBase);
-    const n = parseInt(dados.aQtd) || 0;
-    const jurosTexto = (dados.aJuros || "0").toString().replace(',', '.');
-    const i = parseFloat(jurosTexto) / 100 || 0;
-    
-    let parcela = n > 0 ? (i > 0 ? pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBaseA / n) : 0;
-    
-    setCalculos(prev => ({ ...prev, parcelaAnual: parcela }));
-    setEtapa(4);
+    const pBaseA = parseMoeda(aValorBase);
+    const n = parseInt(aQtd) || 0;
+    const i = parseFloat(aJuros.replace(',', '.')) / 100 || 0;
+    let parcela = 0;
+
+    if (n > 0) {
+      parcela = i > 0 ? (pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1)) : (pBaseA / n);
+    }
+
+    setAParcelaComJuros(parcela);
+    setEtapa(5);
   };
 
+  const reset = () => {
+    setEtapa(1);
+    setCliente(''); setImovel(''); setValorTotal(''); setEntrada('');
+    setCapMeses(''); setCapJuros(''); setMValorBase(''); setMQtd('');
+    setMJuros(''); setAValorBase(''); setAQtd(''); setAJuros('');
+  };
+
+  // --- RENDERIZAÇÃO ---
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F0F2F5' }}>
-      {/* No Android 14, removemos o 'behavior' para evitar loops de renderização no teclado */}
-      <KeyboardAvoidingView 
-        behavior={Platform.OS === "ios" ? "padding" : undefined} 
-        style={{ flex: 1 }}
-      >
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
-          <Text style={styles.header}>Simulador Financeiro</Text>
+    <SafeAreaView style={styles.container}>
+      <KeyboardAvoidingView behavior={Platform.OS === "ios" ? "padding" : "height"} style={{flex: 1}}>
+        <ScrollView ref={scrollViewRef} contentContainerStyle={styles.scrollContent}>
+          
+          <Text style={styles.title}>Simulador Saldo Zero</Text>
 
-          <Card title="1. Dados Iniciais">
-            <CustomInput label="CLIENTE" value={dados.cliente} onChangeText={t => setDados({...dados, cliente: t})} />
-            <CustomInput label="VALOR IMÓVEL" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.valorTotal))} onChangeText={t => handleMoedaInput(t, 'valorTotal')} />
-            <CustomInput label="ENTRADA" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.entrada))} onChangeText={t => handleMoedaInput(t, 'entrada')} />
-            {etapa === 1 && <Btn onPress={validarEtapa1} color="#2c3e50" title="PRÓXIMO" />}
-            {calculos.saldoInicial > 0 && <Text style={styles.res}>Saldo: {formatarMoeda(calculos.saldoInicial)}</Text>}
-          </Card>
+          {/* ETAPA 1: DADOS INICIAIS */}
+          <View style={styles.card}>
+            <Text style={styles.label}>NOME DO CLIENTE</Text>
+            <TextInput style={styles.input} value={cliente} onChangeText={setCliente} placeholder="Ex: João Silva" />
+            
+            <Text style={styles.label}>VALOR TOTAL DO IMÓVEL</Text>
+            <TextInput style={styles.input} value={valorTotal} onChangeText={(t) => setValorTotal(formatMoeda(t))} keyboardType="numeric" />
+            
+            <Text style={styles.label}>VALOR ENTRADA</Text>
+            <TextInput style={styles.input} value={entrada} onChangeText={(t) => setEntrada(formatMoeda(t))} keyboardType="numeric" />
 
-          {etapa >= 2 && (
-            <Card title="2. Mensalidades" color="#3498db">
-              <CustomInput label="VALOR BASE MENSAL" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.mValorBase))} onChangeText={t => handleMoedaInput(t, 'mValorBase')} />
-              <CustomInput label="QTD MESES" keyboardType="numeric" value={dados.mQtd} onChangeText={t => setDados({...dados, mQtd: t})} />
-              <CustomInput label="JUROS %" keyboardType="numeric" value={dados.mJuros} onChangeText={t => setDados({...dados, mJuros: t})} />
-              {etapa === 2 && <Btn onPress={calcularMensal} color="#3498db" title="CALCULAR MENSAL" />}
-              {calculos.parcelaMensal > 0 && <Text style={styles.resBlue}>Parcela: {formatarMoeda(calculos.parcelaMensal)}</Text>}
-            </Card>
-          )}
+            <TouchableOpacity style={styles.btnPrimary} onPress={calcularEtapa1} disabled={etapa > 1}>
+              <Text style={styles.btnText}>{etapa > 1 ? "✓ VALIDADO" : "VALIDAR DADOS"}</Text>
+            </TouchableOpacity>
+            {saldoDevedorBase > 0 && <Text style={styles.resSub}>Saldo: R$ {saldoDevedorBase.toLocaleString('pt-BR')}</Text>}
+          </View>
 
-          {etapa >= 3 && (
-            <Card title="3. Anuais/Reforços" color="#e74c3c">
-              <CustomInput label="VALOR BASE ANUAL" keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.aValorBase))} onChangeText={t => handleMoedaInput(t, 'aValorBase')} />
-              <CustomInput label="QTD ANOS" keyboardType="numeric" value={dados.aQtd} onChangeText={t => setDados({...dados, aQtd: t})} />
-              <CustomInput label="JUROS %" keyboardType="numeric" value={dados.aJuros} onChangeText={t => setDados({...dados, aJuros: t})} />
-              {etapa === 3 && <Btn onPress={calcularAnual} color="#e74c3c" title="CALCULAR ANUAL" />}
-              {calculos.parcelaAnual > 0 && <Text style={styles.resRed}>Parcela Anual: {formatarMoeda(calculos.parcelaAnual)}</Text>}
-            </Card>
-          )}
-
-          {etapa === 4 && (
-            <View style={styles.footer}>
-              <Text style={styles.ok}>Simulação Finalizada!</Text>
-              <Btn onPress={resetGeral} color="#e67e22" title="RECOMEÇAR TUDO" />
+          {/* ETAPA 2: CAPITALIZAÇÃO */}
+          {etapa >= 2 && etapa !== 3 && etapa !== 4 && etapa !== 5 && (
+            <View style={[styles.card, {borderColor: '#8e44ad', borderLeftWidth: 5}]}>
+              <Text style={styles.labelColor}>VALOR FUTURO (JUROS DE OBRA)</Text>
+              <TextInput style={styles.input} placeholder="Meses" value={capMeses} onChangeText={setCapMeses} keyboardType="numeric" />
+              <TextInput style={styles.input} placeholder="Taxa %" value={capJuros} onChangeText={setCapJuros} keyboardType="numeric" />
+              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#8e44ad'}]} onPress={calcularCapitalizacao}>
+                <Text style={styles.btnText}>CALCULAR VALOR FUTURO</Text>
+              </TouchableOpacity>
             </View>
           )}
+
+          {/* ETAPA 3: MENSALIDADES */}
+          {etapa >= 3 && (
+            <View style={[styles.card, {borderColor: '#3498db', borderLeftWidth: 5}]}>
+              <Text style={styles.labelColor}>MENSALIDADES</Text>
+              <TextInput style={styles.input} value={mVaiorBase} onChangeText={(t) => setMValorBase(formatMoeda(t))} placeholder="Valor Base para Mensais" keyboardType="numeric" />
+              <TextInput style={styles.input} placeholder="Qtd Meses" value={mQtd} onChangeText={setMQtd} keyboardType="numeric" />
+              <TextInput style={styles.input} placeholder="Taxa Mensal %" value={mJuros} onChangeText={setMJuros} keyboardType="numeric" />
+              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#3498db'}]} onPress={calcularMensal} disabled={etapa > 3}>
+                <Text style={styles.btnText}>{etapa > 3 ? "✓ CALCULADO" : "CALCULAR MENSAL"}</Text>
+              </TouchableOpacity>
+              {mParcelaComJuros > 0 && <Text style={styles.resSub}>Parcela: R$ {mParcelaComJuros.toFixed(2)}</Text>}
+            </View>
+          )}
+
+          {/* ETAPA 4: ANUAIS */}
+          {etapa >= 4 && (
+            <View style={[styles.card, {borderColor: '#e74c3c', borderLeftWidth: 5}]}>
+              <Text style={styles.labelColor}>ANUAIS / REFORÇOS</Text>
+              <TextInput style={styles.input} value={aValorBase} onChangeText={(t) => setAValorBase(formatMoeda(t))} keyboardType="numeric" />
+              <TextInput style={styles.input} placeholder="Qtd Anos" value={aQtd} onChangeText={setAQtd} keyboardType="numeric" />
+              <TextInput style={styles.input} placeholder="Taxa Anual %" value={aJuros} onChangeText={setAJuros} keyboardType="numeric" />
+              <TouchableOpacity style={[styles.btnPrimary, {backgroundColor: '#e74c3c'}]} onPress={calcularAnual} disabled={etapa > 4}>
+                <Text style={styles.btnText}>{etapa > 4 ? "✓ CALCULADO" : "CALCULAR ANUAL"}</Text>
+              </TouchableOpacity>
+              {aParcelaComJuros > 0 && <Text style={styles.resSub}>Anual: R$ {aParcelaComJuros.toFixed(2)}</Text>}
+            </View>
+          )}
+
+          {/* FINALIZAÇÃO */}
+          {etapa === 5 && (
+            <View style={styles.cardFinal}>
+              <Text style={styles.finalTitle}>✓ SIMULAÇÃO CONCLUÍDA</Text>
+              <Text>Cliente: {cliente}</Text>
+              <Text>Saldo Final Zerado com sucesso.</Text>
+              <TouchableOpacity style={styles.btnReset} onPress={reset}>
+                <Text style={styles.btnText}>NOVA SIMULAÇÃO</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
 
-const Card = ({ children, title, color = "#2c3e50" }) => (
-  <View style={[styles.card, { borderTopColor: color }]}>
-    <Text style={[styles.cardTitle, { color }]}>{title}</Text>
-    {children}
-  </View>
-);
-
-const CustomInput = ({ label, ...props }) => (
-  <View style={styles.inputGap}>
-    <Text style={styles.label}>{label}</Text>
-    <TextInput {...props} style={styles.input} />
-  </View>
-);
-
-const Btn = ({ title, onPress, color }) => (
-  <TouchableOpacity activeOpacity={0.7} onPress={onPress} style={[styles.btn, { backgroundColor: color }]}>
-    <Text style={styles.btnText}>{title}</Text>
-  </TouchableOpacity>
-);
-
 const styles = StyleSheet.create({
-  scrollContent: { padding: 20, paddingBottom: 50 },
-  header: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 20, color: '#2c3e50' },
-  card: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 15, borderTopWidth: 4, elevation: 3 },
-  cardTitle: { fontWeight: 'bold', marginBottom: 10 },
-  label: { fontSize: 10, color: '#95a5a6' },
-  input: { borderBottomWidth: 1, borderBottomColor: '#eee', paddingVertical: 5, marginBottom: 10, fontSize: 16, color: '#000' },
-  inputGap: { marginBottom: 5 },
-  btn: { padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
+  container: { flex: 1, backgroundColor: '#F0F2F5' },
+  scrollContent: { padding: 20 },
+  title: { fontSize: 22, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center', marginBottom: 20 },
+  card: { backgroundColor: 'white', padding: 15, borderRadius: 10, marginBottom: 15, elevation: 3 },
+  cardFinal: { backgroundColor: '#dff9fb', padding: 20, borderRadius: 10, alignItems: 'center' },
+  label: { fontSize: 12, fontWeight: 'bold', color: '#636e72', marginBottom: 5 },
+  labelColor: { fontSize: 14, fontWeight: 'bold', marginBottom: 10 },
+  input: { backgroundColor: '#f9f9f9', borderWidth: 1, borderColor: '#ddd', borderRadius: 5, padding: 10, marginBottom: 10 },
+  btnPrimary: { backgroundColor: '#2c3e50', padding: 15, borderRadius: 5, alignItems: 'center' },
+  btnReset: { backgroundColor: '#e67e22', padding: 15, borderRadius: 5, alignItems: 'center', marginTop: 15, width: '100%' },
   btnText: { color: 'white', fontWeight: 'bold' },
-  footer: { marginTop: 20, alignItems: 'center' },
-  ok: { color: '#27ae60', fontWeight: 'bold', marginBottom: 10 },
-  res: { textAlign: 'center', fontWeight: 'bold', marginTop: 10 },
-  resBlue: { textAlign: 'center', color: '#2980b9', fontWeight: 'bold', marginTop: 5 },
-  resRed: { textAlign: 'center', color: '#c0392b', fontWeight: 'bold', marginTop: 5 },
+  resSub: { marginTop: 10, fontSize: 16, fontWeight: 'bold', color: '#2c3e50', textAlign: 'center' },
+  finalTitle: { fontSize: 18, fontWeight: 'bold', color: '#27ae60', marginBottom: 10 }
 });
