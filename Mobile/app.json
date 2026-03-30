@@ -7,7 +7,7 @@
     "userInterfaceStyle": "light",
     "icon": "./assets/icon.png",
     "android": {
-      "package": "com.augustogabriel.simulador.v1.6",
+      "package": "com.augustogabriel.simuladornovo",
       "jsEngine": "jsc",
       "softwareKeyboardLayoutMode": "pan",
       "allowBackup": false,
