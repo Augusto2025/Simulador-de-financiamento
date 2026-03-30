@@ -3,18 +3,15 @@
     "name": "Simulador Financeiro",
     "slug": "simulador-financeiro",
     "version": "1.0.0",
-    "orientation": "portrait",
-    "userInterfaceStyle": "light",
     "android": {
-      "package": "com.augustogabriel.simuladorfinanceiro",
-      "jsEngine": "jsc",
-      "softwareKeyboardLayoutMode": "pan"
+      "package": "com.augustogabriel.simuladorfinal", 
+      "jsEngine": "hermes",
+      "newArchEnabled": false
     },
     "extra": {
       "eas": {
         "projectId": "b21c76eb-0a81-438e-9f01-6c2e5952507f"
       }
-    },
-    "owner": "augusto25"
+    }
   }
 }
