@@ -5,16 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/icon.png",
     "android": {
-      "package": "com.augustogabriel.simuladornovo",
+      "package": "com.augustogabriel.simuladorfinanceiro",
       "jsEngine": "jsc",
-      "softwareKeyboardLayoutMode": "pan",
-      "allowBackup": false,
-      "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
-        "foregroundImage": "./assets/android-icon-foreground.png"
-      }
+      "softwareKeyboardLayoutMode": "pan"
     },
     "extra": {
       "eas": {
