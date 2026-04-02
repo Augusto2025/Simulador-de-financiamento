@@ -7,19 +7,20 @@
     "userInterfaceStyle": "light",
     "android": {
       "package": "com.augustogabriel.simuladorv12",
-      "jsEngine": "hermes",
-      "newArchEnabled": false
+      "jsEngine": "hermes"
     },
     "plugins": [
       [
         "expo-build-properties",
         {
           "android": {
-            "enableProguardInReleaseBuilds": true
+            "enableProguardInReleaseBuilds": true,
+            "enableMinifyInReleaseBuilds": true
           }
         }
       ]
     ],
+    "owner": "augusto25",
     "extra": {
       "eas": {
         "projectId": "b21c76eb-0a81-438e-9f01-6c2e5952507f"

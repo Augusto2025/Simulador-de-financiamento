@@ -16,6 +16,9 @@ A) No arquivo 'app.json':
      }
    - "extra": { "eas": { "projectId": "SEU-ID-AQUI" } }
 
+usar o comando: eas project:init
+pra descobrir o id
+
 B) No arquivo 'eas.json' (na raiz do projeto):
    Deve existir o perfil de preview para gerar o APK:
    {
