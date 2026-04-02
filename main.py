@@ -59,11 +59,6 @@ try:
     if os.path.exists(icon_path): root.iconbitmap(icon_path)
 except: pass
 
-# ... (Restante do seu código de lógica de cálculos permanece igual) ...
-
-# Nota: Mantive as funções etapa_1_entrada, etapa_capitalizacao, etc., 
-# pois a lógica de cálculo não interfere no erro de inicialização.
-
 def formatar_moeda(event):
     entry = event.widget
     valor = entry.get()
@@ -275,13 +270,13 @@ def gerar_pdf():
     ]
     
     if 'cap_total' in dados_pdf:
-        tabela.append(["VALOR FUTURO", f"{dados_pdf['cap_n']}m", f"{dados_pdf['cap_j']:.2f}%", "-", f"R$ {dados_pdf['cap_total']:,.2f}"])
+        tabela.append(["VALOR FUTURO", f"{dados_pdf['cap_n']}m", f"{dados_pdf['cap_j']:.4f}%", "-", f"R$ {dados_pdf['cap_total']:,.2f}"])
     
     if 'm_valor' in dados_pdf:
-        tabela.append(["MENSALIDADES", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.2f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}"])
+        tabela.append(["MENSALIDADES", f"{dados_pdf['m_qtd']}x", f"{dados_pdf['m_juros']:.4f}%", f"R$ {dados_pdf['m_base']:,.2f}", f"R$ {dados_pdf['m_valor']:,.2f}"])
     
     if 'a_valor' in dados_pdf:
-        tabela.append(["ANUAIS", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.2f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}"])
+        tabela.append(["ANUAIS", f"{dados_pdf['a_qtd']}x", f"{dados_pdf['a_juros']:.4f}%", f"R$ {dados_pdf['a_base']:,.2f}", f"R$ {dados_pdf['a_valor']:,.2f}"])
     
     t = Table(tabela, colWidths=[100, 50, 70, 110, 110])
     t.setStyle(TableStyle([
@@ -296,6 +291,10 @@ def gerar_pdf():
     doc.build(elements)
     messagebox.showinfo("Sucesso", "PDF Gerado!")
 
+import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.styles import Alignment
+
 def gerar_excel():
     path = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=[("Excel files", "*.xlsx")])
     if not path: return
@@ -304,16 +303,49 @@ def gerar_excel():
             {"DESCRIÇÃO": "VALOR TOTAL", "PARCELA C/ JUROS": dados_pdf.get('total', 0)},
             {"DESCRIÇÃO": "ENTRADA", "PARCELA C/ JUROS": dados_pdf.get('entrada', 0)}
         ]
+        
         if 'cap_total' in dados_pdf:
-            tabela_dados.append({"DESCRIÇÃO": "VALOR FUTURO", "QTD": f"{dados_pdf['cap_n']}m", "JUROS %": dados_pdf['cap_j'], "PARCELA C/ JUROS": dados_pdf['cap_total']})
+            tabela_dados.append({"DESCRIÇÃO": "VALOR FUTURO", "QTD": f"{dados_pdf['cap_n']}m", "JUROS %": f"{dados_pdf['cap_j']:.2f}%", "PARCELA C/ JUROS": dados_pdf['cap_total']})
         if 'm_valor' in dados_pdf:
-            tabela_dados.append({"DESCRIÇÃO": "MENSALIDADES", "QTD": f"{dados_pdf['m_qtd']}x", "JUROS %": dados_pdf['m_juros'], "VALOR BASE": dados_pdf['m_base'], "PARCELA C/ JUROS": dados_pdf['m_valor']})
+            tabela_dados.append({"DESCRIÇÃO": "MENSALIDADES", "QTD": f"{dados_pdf['m_qtd']}x", "JUROS %": f"{dados_pdf['m_juros']:.2f}%", "VALOR BASE": dados_pdf['m_base'], "PARCELA C/ JUROS": dados_pdf['m_valor']})
         if 'a_valor' in dados_pdf:
-            tabela_dados.append({"DESCRIÇÃO": "ANUAL", "QTD": f"{dados_pdf['a_qtd']}x", "JUROS %": dados_pdf['a_juros'], "VALOR BASE": dados_pdf['a_base'], "PARCELA C/ JUROS": dados_pdf['a_valor']})
+            tabela_dados.append({"DESCRIÇÃO": "ANUAL", "QTD": f"{dados_pdf['a_qtd']}x", "JUROS %": f"{dados_pdf['a_juros']:.2f}%", "VALOR BASE": dados_pdf['a_base'], "PARCELA C/ JUROS": dados_pdf['a_valor']})
         
         df = pd.DataFrame(tabela_dados)
+        
+        # 1. Gera o Excel
         df.to_excel(path, index=False)
-        messagebox.showinfo("Sucesso", "Excel Gerado!")
+        
+        # 2. Abre para formatação rigorosa
+        wb = load_workbook(path)
+        ws = wb.active
+
+        # Estilo de alinhamento à direita
+        alinhar_direita = Alignment(horizontal='left', vertical='center')
+
+        # Percorre todas as linhas e colunas (incluindo cabeçalho na linha 1)
+        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+            for cell in row:
+                cell.alignment = alinhar_direita
+                
+                # Se for valor financeiro (colunas de valor), aplica formato de número
+                # Isso ajuda o Excel a manter o alinhamento à direita naturalmente
+                if isinstance(cell.value, (int, float)):
+                    cell.number_format = '#,##0.00'
+
+        # Ajuste de largura de coluna para garantir que o alinhamento seja visível
+        for col in ws.columns:
+            max_length = 0
+            column = col[0].column_letter
+            for cell in col:
+                if cell.value:
+                    val_len = len(str(cell.value))
+                    if val_len > max_length: max_length = val_len
+            ws.column_dimensions[column].width = max_length + 5
+
+        wb.save(path)
+        messagebox.showinfo("Sucesso", "Excel Gerado")
+
     except Exception as e:
         messagebox.showerror("Erro", f"Erro ao gerar Excel: {e}")
 
