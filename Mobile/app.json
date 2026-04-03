@@ -6,12 +6,15 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "ios": {
-      "bundleIdentifier": "com.augusto25.simuladorfinanceiro",
+      "bundleIdentifier": "com.guts26.simuladorfinanceiro",
       "supportsTablet": true
     },
     "android": {
-      "package": "com.augustogabriel.simuladorv12",
-      "jsEngine": "hermes"
+      "package": "com.guts26.simuladorfinanceiro",
+      "jsEngine": "hermes",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/icon.png"
+      }
     },
     "plugins": [
       [
@@ -24,10 +27,10 @@
         }
       ]
     ],
-    "owner": "augusto25",
+    "owner": "guts26",
     "extra": {
       "eas": {
-        "projectId": "b21c76eb-0a81-438e-9f01-6c2e5952507f"
+        "projectId": "4006c4ae-18d4-492e-ae76-9e404d593821"
       }
     }
   }
