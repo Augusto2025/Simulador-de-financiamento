@@ -1,3 +1,5 @@
+criando automatico o ambiente: npx create-expo-app@latest --template blank deafult@sdk-54
+
 ====================================================================
 GUIA DEFINITIVO: GERANDO APK COM REACT NATIVE + EXPO + GITHUB ACTIONS
 ====================================================================

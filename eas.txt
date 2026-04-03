@@ -1,0 +1,91 @@
+=======================================================================
+           GUIA PASSO A PASSO: CONFIGURAÇÃO E BUILD (EAS CLI)
+=======================================================================
+
+Este guia pressupõe que você já tem o Node.js instalado e seu projeto 
+React Native (Expo) funcionando localmente.
+
+-----------------------------------------------------------------------
+1. INSTALAÇÃO E LOGIN
+-----------------------------------------------------------------------
+Abra o terminal na pasta do seu projeto e execute:
+
+# Instala o utilitário de build da Expo globalmente
+npm install -g eas-cli
+
+# Faz login na sua conta (abrirá o navegador)
+eas login
+
+# (Opcional) Se precisar usar o Access Token em vez de senha:
+# No Windows (PowerShell): $env:EXPO_TOKEN="seu_token_aqui"
+# No Mac/Linux: export EXPO_TOKEN=seu_token_aqui
+
+-----------------------------------------------------------------------
+2. CONFIGURAÇÃO DO PROJETO (Uma única vez)
+-----------------------------------------------------------------------
+Execute o comando abaixo para preparar o projeto para builds nuvem:
+
+eas build:configure
+
+> O terminal perguntará: "Which platforms would you like to configure?"
+> Selecione: "All" (ou use as setas para Android/iOS).
+
+Isso criará um arquivo chamado 'eas.json' na raiz do seu projeto.
+
+-----------------------------------------------------------------------
+3. AJUSTE PARA GERAR APK (Android)
+-----------------------------------------------------------------------
+Por padrão, a Expo gera um arquivo .aab (para a Play Store). 
+Para gerar um APK instalável no seu celular, abra o arquivo 'eas.json' 
+e edite o perfil "preview" para ficar assim:
+
+{
+  "build": {
+    "preview": {
+      "android": {
+        "buildType": "apk"
+      }
+    },
+    "production": {}
+  }
+}
+
+-----------------------------------------------------------------------
+4. COMANDOS DE BUILD (GERAR O APP)
+-----------------------------------------------------------------------
+
+# PARA ANDROID (Gerar APK de teste):
+eas build -p android --profile preview
+
+# PARA ANDROID (Gerar arquivo final .aab para a Loja):
+eas build -p android --profile production
+
+# PARA iOS (Requer conta de desenvolvedor Apple paga):
+eas build -p ios --profile production
+
+-----------------------------------------------------------------------
+5. O QUE FAZER DURANTE A BUILD?
+-----------------------------------------------------------------------
+- O EAS perguntará sobre "Android Keystore" ou "Apple Credentials".
+- Se você não tiver chaves anteriores, selecione "YES" para que a 
+  Expo gere e cuide de tudo para você (recomendado).
+- O processo acontece nos servidores da Expo. Você pode fechar o 
+  terminal; o link enviado no log mostrará o progresso.
+- Ao final, você receberá um link de download ou um QR Code.
+
+-----------------------------------------------------------------------
+6. COMANDOS ÚTEIS
+-----------------------------------------------------------------------
+# Ver lista de builds feitas:
+eas build:list
+
+# Verificar quem está logado:
+eas whoami
+
+# Verificar se o projeto está vinculado corretamente:
+eas project:info
+
+=======================================================================
+DICA: Verifique sempre se o "package" no seu app.json está definido, 
+ex: "package": "com.seuusuario.simuladorsaldozero"
+=======================================================================
