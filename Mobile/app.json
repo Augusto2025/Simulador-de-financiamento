@@ -5,6 +5,10 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "com.augusto25.simuladorfinanceiro",
+      "supportsTablet": true
+    },
     "android": {
       "package": "com.augustogabriel.simuladorv12",
       "jsEngine": "hermes"
