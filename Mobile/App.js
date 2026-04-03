@@ -1,20 +1,18 @@
 import React, { useState } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, ScrollView, 
-  Alert, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView,
-  useColorScheme // 1. Importar o hook de tema
+  Alert, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView
 } from 'react-native';
 
 import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 
 export default function App() {
-  // 2. Detectar se o sistema está no modo 'dark' ou 'light'
-  const colorScheme = useColorScheme();
-  const isDarkMode = colorScheme === 'dark';
+  // --- LÓGICA DE TEMA (Iniciando sempre como TRUE / Escuro) ---
+  const [isDarkMode, setIsDarkMode] = useState(true);
 
-  // 3. Definir paleta de cores dinâmica
+  const toggleTheme = () => setIsDarkMode(!isDarkMode);
+
   const theme = {
     background: isDarkMode ? '#121212' : '#F0F2F5',
     card: isDarkMode ? '#1E1E1E' : '#FFFFFF',
@@ -25,6 +23,7 @@ export default function App() {
     placeholder: isDarkMode ? '#666' : '#ccc',
   };
 
+  // --- ESTADOS DO SISTEMA ---
   const [etapa, setEtapa] = useState(1);
   const [dados, setDados] = useState({
     cliente: '', imovel: '', valorTotal: '', entrada: '',
@@ -74,6 +73,60 @@ export default function App() {
     }
   };
 
+  // --- FUNÇÕES DE CÁLCULO ---
+  const validarEtapa1 = () => {
+    const total = converterParaFloat(dados.valorTotal);
+    if (total <= 0) return Alert.alert("Erro", "Informe o Valor Total.");
+    const saldo = total - converterParaFloat(dados.entrada);
+    setCalculos(prev => ({ ...prev, saldoDevedor: saldo, saldoInicial: saldo }));
+    
+    Alert.alert("Confirmação", "Deseja capitalizar o saldo?", [
+      { text: "NÃO", onPress: () => setEtapa(3) },
+      { text: "SIM", onPress: () => setEtapa(2) }
+    ]);
+  };
+
+  const calcularCapitalizacao = () => {
+    const n = parseInt(dados.capMeses) || 0;
+    const i = parseFloat(dados.capJuros.replace(',', '.')) / 100 || 0;
+    const vf = calculos.saldoDevedor * Math.pow((1 + i), n);
+    setCalculos(prev => ({ ...prev, valorFuturo: vf, saldoDevedor: vf }));
+    setEtapa(3);
+  };
+
+  const calcularMensal = () => {
+    const pBase = converterParaFloat(dados.mValorBase);
+    if (pBase > (calculos.saldoDevedor + 0.01)) {
+      return Alert.alert("Valor Inválido", "O Valor Base Mensal não pode ser maior que o Saldo Devedor.");
+    }
+    const n = parseInt(dados.mQtd) || 0;
+    const i = parseFloat(dados.mJuros.replace(',', '.')) / 100 || 0;
+    let parcela = n > 0 ? (i > 0 ? pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBase / n) : 0;
+    setCalculos(prev => ({ ...prev, parcelaMensal: parcela }));
+    
+    // CORREÇÃO: Reduzi a tolerância para 0 para que sobras pequenas (como 0,09) obrigatoriamente peçam as anuais.
+    const falta = calculos.saldoDevedor - pBase;
+    if (falta <= 0.001) { 
+      setEtapa(5); 
+    } else {
+      setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) }));
+      setEtapa(4);
+    }
+  };
+
+  const calcularAnual = () => {
+    const pBaseA = converterParaFloat(dados.aValorBase);
+    const saldoRestante = calculos.saldoDevedor - converterParaFloat(dados.mValorBase);
+    if (pBaseA > (saldoRestante + 0.05)) {
+      return Alert.alert("Valor Inválido", "O Valor Base Anual excede o saldo restante.");
+    }
+    const n = parseInt(dados.aQtd) || 0;
+    const i = parseFloat(dados.aJuros.replace(',', '.')) / 100 || 0;
+    let parcela = n > 0 ? (i > 0 ? pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBaseA / n) : 0;
+    setCalculos(prev => ({ ...prev, parcelaAnual: parcela }));
+    setEtapa(5);
+  };
+
   const gerarPDF = async () => {
     const html = `
       <html>
@@ -95,11 +148,18 @@ export default function App() {
           <div class="card">
             <div class="row"><span>Valor do Imóvel:</span> <span>${formatarMoeda(converterParaFloat(dados.valorTotal))}</span></div>
             <div class="row"><span>Entrada:</span> <span>${formatarMoeda(converterParaFloat(dados.entrada))}</span></div>
-            ${calculos.valorFuturo > 0 ? `<div class="row"><span>Saldo Capitalizado:</span> <span>${formatarMoeda(calculos.valorFuturo)}</span></div>` : ''}
+            ${calculos.valorFuturo > 0 ? `
+              <div class="row"><span>Saldo Capitalizado:</span> <span>${formatarMoeda(calculos.valorFuturo)}</span></div>
+              <div class="row"><span>Taxa Cap. (${dados.capMeses} meses):</span> <span>${dados.capJuros}%</span></div>
+            ` : ''}
           </div>
           <div class="card">
             <div class="row"><span class="label">Mensalidades (${dados.mQtd}x):</span> <span>${formatarMoeda(calculos.parcelaMensal)}</span></div>
-            ${calculos.parcelaAnual > 0 ? `<div class="row"><span class="label">Reforços Anuais (${dados.aQtd}x):</span> <span>${formatarMoeda(calculos.parcelaAnual)}</span></div>` : ''}
+            <div class="row"><span class="label">Juros Mensal:</span> <span>${dados.mJuros}%</span></div>
+            ${calculos.parcelaAnual > 0 ? `
+              <div class="row" style="margin-top:10px;"><span class="label">Anuais (${dados.aQtd}x):</span> <span>${formatarMoeda(calculos.parcelaAnual)}</span></div>
+              <div class="row"><span class="label">Juros Anual:</span> <span>${dados.aJuros}%</span></div>
+            ` : ''}
           </div>
         </body>
       </html>
@@ -108,76 +168,6 @@ export default function App() {
       const { uri } = await Print.printToFileAsync({ html });
       await Sharing.shareAsync(uri);
     } catch (e) { Alert.alert("Erro", "Falha ao gerar PDF"); }
-  };
-
-  const gerarExcel = async () => {
-    try {
-      let csv = "\ufeff"; 
-      csv += `Cliente;${dados.cliente || '---'}\n`;
-      csv += `Imovel;${dados.imovel || '---'}\n\n`;
-      csv += "Descricao;Qtd;Juros %;Parcela\n";
-      csv += `Mensalidades;${dados.mQtd};${dados.mJuros}%;${calculos.parcelaMensal.toFixed(2).replace('.', ',')}\n`;
-      
-      if (calculos.parcelaAnual > 0) {
-        csv += `Anuais;${dados.aQtd};${dados.aJuros}%;${calculos.parcelaAnual.toFixed(2).replace('.', ',')}\n`;
-      }
-
-      const fileUri = FileSystem.cacheDirectory + "Simulacao.csv";
-      await FileSystem.writeAsStringAsync(fileUri, csv, { encoding: FileSystem.EncodingType.UTF8 });
-      await Sharing.shareAsync(fileUri);
-    } catch (e) { 
-      Alert.alert("Erro", "Falha ao gerar Excel"); 
-    }
-  };
-
-  const validarEtapa1 = () => {
-    const total = converterParaFloat(dados.valorTotal);
-    if (total <= 0) return Alert.alert("Erro", "Informe o Valor Total.");
-    const saldo = total - converterParaFloat(dados.entrada);
-    setCalculos(prev => ({ ...prev, saldoDevedor: saldo, saldoInicial: saldo }));
-    Alert.alert("Confirmação", "Deseja capitalizar o saldo?", [
-      { text: "NÃO", onPress: () => setEtapa(3) },
-      { text: "SIM", onPress: () => setEtapa(2) }
-    ]);
-  };
-
-  const calcularCapitalizacao = () => {
-    const n = parseInt(dados.capMeses) || 0;
-    const i = parseFloat(dados.capJuros.replace(',', '.')) / 100 || 0;
-    const vf = calculos.saldoDevedor * Math.pow((1 + i), n);
-    setCalculos(prev => ({ ...prev, valorFuturo: vf, saldoDevedor: vf }));
-    setEtapa(3);
-  };
-
-  const calcularMensal = () => {
-    const pBase = converterParaFloat(dados.mValorBase);
-    if (pBase > (calculos.saldoDevedor + 0.01)) {
-        return Alert.alert("Valor Inválido", "O Valor Base Mensal não pode ser maior que o Saldo Devedor.");
-    }
-    const n = parseInt(dados.mQtd) || 0;
-    const i = parseFloat(dados.mJuros.replace(',', '.')) / 100 || 0;
-    let parcela = n > 0 ? (i > 0 ? pBase * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBase / n) : 0;
-    setCalculos(prev => ({ ...prev, parcelaMensal: parcela }));
-    const falta = calculos.saldoDevedor - pBase;
-    if (falta <= 0.10) { 
-        setEtapa(5); 
-    } else {
-        setDados(prev => ({ ...prev, aValorBase: (falta * 100).toFixed(0) }));
-        setEtapa(4);
-    }
-  };
-
-  const calcularAnual = () => {
-    const pBaseA = converterParaFloat(dados.aValorBase);
-    const saldoRestante = calculos.saldoDevedor - converterParaFloat(dados.mValorBase);
-    if (pBaseA > (saldoRestante + 0.05)) {
-        return Alert.alert("Valor Inválido", "O Valor Base Anual excede o saldo restante da simulação.");
-    }
-    const n = parseInt(dados.aQtd) || 0;
-    const i = parseFloat(dados.aJuros.replace(',', '.')) / 100 || 0;
-    let parcela = n > 0 ? (i > 0 ? pBaseA * (i * Math.pow(1 + i, n)) / (Math.pow(1 + i, n) - 1) : pBaseA / n) : 0;
-    setCalculos(prev => ({ ...prev, parcelaAnual: parcela }));
-    setEtapa(5);
   };
 
   const resetGeral = () => {
@@ -231,7 +221,7 @@ export default function App() {
           )}
 
           {(etapa === 4 || (etapa === 5 && calculos.parcelaAnual > 0)) ? (
-            <Card title="4. Anuais/Reforços" color="#e74c3c" theme={theme}>
+            <Card title="4. Anuais" color="#e74c3c" theme={theme}>
               <CustomInput label="VALOR BASE ANUAL *" theme={theme} keyboardType="numeric" value={formatarMoeda(converterParaFloat(dados.aValorBase))} onChangeText={t => handleMoedaInput(t, 'aValorBase')} />
               <CustomInput label="QTD ANUAIS *" theme={theme} keyboardType="numeric" value={dados.aQtd} onChangeText={t => setDados({...dados, aQtd: t})} />
               <CustomInput label="JUROS % *" theme={theme} keyboardType="numeric" value={dados.aJuros} onChangeText={t => setDados({...dados, aJuros: t})} />
@@ -249,12 +239,17 @@ export default function App() {
             <View style={styles.footer}>
               <Text style={styles.ok}>Simulação Finalizada!</Text>
               <View style={styles.rowExport}>
-                <Btn onPress={gerarPDF} color="#27ae60" title="PDF" half />
-                <Btn onPress={gerarExcel} color="#107c41" title="EXCEL" half />
+                <Btn onPress={gerarPDF} color="#27ae60" title="GERAR PDF" half />
+                <Btn 
+                  onPress={toggleTheme} 
+                  color={isDarkMode ? "#f1c40f" : "#2c3e50"} 
+                  title={isDarkMode ? "MODO CLARO" : "MODO ESCURO"} 
+                  half 
+                />
               </View>
               <View style={styles.rowButtons}>
                 <Btn onPress={voltarEtapa} color="#95a5a6" title="CORRIGIR" half />
-                <Btn onPress={resetGeral} color="#e67e22" title="NOVA" half />
+                <Btn onPress={resetGeral} color="#e67e22" title="NOVA SIMULAÇÃO" half />
               </View>
             </View>
           )}
@@ -264,7 +259,7 @@ export default function App() {
   );
 }
 
-// --- COMPONENTES ATUALIZADOS ---
+// --- COMPONENTES AUXILIARES ---
 const Card = ({ children, title, color = "#2c3e50", theme }) => (
   <View style={[styles.card, { backgroundColor: theme.card, borderTopColor: color }]}>
     <Text style={[styles.cardTitle, { color }]}>{title}</Text>
@@ -299,7 +294,7 @@ const styles = StyleSheet.create({
   input: { borderBottomWidth: 1, paddingVertical: 8, marginBottom: 10, fontSize: 16 },
   inputGap: { marginBottom: 5 },
   btn: { padding: 15, borderRadius: 8, alignItems: 'center', marginTop: 10 },
-  btnText: { color: 'white', fontWeight: 'bold', fontSize: 13 },
+  btnText: { color: 'white', fontWeight: 'bold', fontSize: 12 },
   rowButtons: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 5 },
   rowExport: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 5, width: '100%' },
   footer: { marginTop: 20, alignItems: 'center', paddingBottom: 50 },
